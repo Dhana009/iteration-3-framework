@@ -1,0 +1,105 @@
+{
+    "ADMIN": [
+        {
+            "email": "admin1@test.com",
+            "password": "Test123!@#",
+            "reserved_by": null
+        },
+        {
+            "email": "admin2@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "admin3@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "admin4@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "admin5@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "admin6@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "admin7@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "admin8@test.com",
+            "password": "Test123!@#"
+        }
+    ],
+    "EDITOR": [
+        {
+            "email": "editor1@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor2@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor3@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor4@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor5@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor6@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor7@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "editor8@test.com",
+            "password": "Test123!@#"
+        }
+    ],
+    "VIEWER": [
+        {
+            "email": "viewer1@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer2@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer3@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer4@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer5@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer6@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer7@test.com",
+            "password": "Test123!@#"
+        },
+        {
+            "email": "viewer8@test.com",
+            "password": "Test123!@#"
+        }
+    ]
+}
