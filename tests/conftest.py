@@ -11,6 +11,7 @@ sys.path.append(ROOT_DIR)
 
 from fixtures.users import UserLease
 from fixtures.auth import SmartAuth
+from fixtures.ui_auth import SmartUIAuth
 from fixtures.seed import check_and_heal_seed
 from utils.api_client import APIClient
 
@@ -60,6 +61,7 @@ def admin_actor(user_lease):
     
     context = {
         "user": auth_user, # Use backend data (with _id)
+        "password": lease_user['password'], # Needed for UI Login
         "token": token,
         "api": APIClient(token=token)
     }
@@ -105,3 +107,82 @@ def viewer_actor(user_lease):
     # Viewers typically don't own seed data, but we might verify they see it?
     # No seed healer needed for viewer usually.
     return context
+
+@pytest.fixture(scope="function")
+def admin_ui_actor(user_lease, browser):
+    """
+    UI-Optimized Fixture:
+    1. Leases ADMIN.
+    2. Ensures UI Session (SmartUIAuth - Reuse/Login).
+    3. Returns {user, page, api}
+    """
+    lease_user = user_lease.acquire("ADMIN")
+    
+    # 1. API Auth (for Teardown/Setup) - Fast
+    api_auth = SmartAuth(lease_user['email'], lease_user['password'])
+    token, auth_user = api_auth.authenticate()
+    api = APIClient(token=token)
+    
+    # 2. UI Auth (for Browser) - Reuse State
+    ui_auth = SmartUIAuth(lease_user['email'], lease_user['password'], browser)
+    state_path = ui_auth.get_storage_state()
+    
+    # 3. Create Context with State
+    context = browser.new_context(storage_state=state_path)
+    page = context.new_page()
+    
+    actor = {
+        "user": auth_user,
+        "password": lease_user['password'],
+        "token": token,
+        "api": api,
+        "page": page,   # Pre-authenticated page
+        "context": context
+    }
+    
+    # Auto-Heal Seed
+    check_and_heal_seed(api, auth_user['_id'])
+    
+    yield actor
+    
+    # Cleanup
+    context.close()
+
+@pytest.fixture(scope="function")
+def editor_ui_actor(user_lease, browser):
+    """
+    UI-Optimized Fixture for EDITOR:
+    1. Leases EDITOR.
+    2. Ensures UI Session (SmartUIAuth).
+    3. Returns {user, page, api}
+    """
+    lease_user = user_lease.acquire("EDITOR")
+    
+    # 1. API Auth (Fast)
+    api_auth = SmartAuth(lease_user['email'], lease_user['password'])
+    token, auth_user = api_auth.authenticate()
+    api = APIClient(token=token)
+    
+    # 2. UI Auth (Reuse State)
+    ui_auth = SmartUIAuth(lease_user['email'], lease_user['password'], browser)
+    state_path = ui_auth.get_storage_state()
+    
+    # 3. Create Context
+    context = browser.new_context(storage_state=state_path)
+    page = context.new_page()
+    
+    actor = {
+        "user": auth_user,
+        "password": lease_user['password'],
+        "token": token,
+        "api": api,
+        "page": page,
+        "context": context
+    }
+    
+    # Auto-Heal Seed
+    check_and_heal_seed(api, auth_user['_id'])
+    
+    yield actor
+    
+    context.close()

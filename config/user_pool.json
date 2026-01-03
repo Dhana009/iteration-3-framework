@@ -7,11 +7,13 @@
         },
         {
             "email": "admin2@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "admin3@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "admin4@test.com",
@@ -37,15 +39,18 @@
     "EDITOR": [
         {
             "email": "editor1@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "editor2@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "editor3@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "editor4@test.com",
