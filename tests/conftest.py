@@ -22,6 +22,34 @@ def worker_id_val(worker_id):
     """
     return worker_id
 
+@pytest.fixture(scope="session", autouse=True)
+def ensure_admin_global_seed(worker_id_val):
+    """
+    Session-scoped fixture to ensure Admin's global seed data exists.
+    Runs ONCE before any tests in the session.
+    This creates the 11-item "Infrastructure" seed data for Admin.
+    """
+    print("\n[GlobalSeed] Ensuring Admin global seed data...")
+    
+    # 1. Lease admin1 temporarily
+    lease = UserLease(worker_id_val)
+    admin_user = lease.acquire("ADMIN")
+    
+    try:
+        # 2. Authenticate
+        auth = SmartAuth(admin_user['email'], admin_user['password'])
+        token, user_data = auth.authenticate()
+        api = APIClient(token=token)
+        
+        # 3. Heal seed data
+        check_and_heal_seed(api, user_data['_id'])
+        
+        print(f"[GlobalSeed] Admin seed verified for {admin_user['email']}")
+    finally:
+        # 4. Release admin
+        lease.release()
+
+
 @pytest.fixture(scope="function")
 def user_lease(worker_id_val):
     """
@@ -186,3 +214,44 @@ def editor_ui_actor(user_lease, browser):
     yield actor
     
     context.close()
+
+@pytest.fixture(scope="function")
+def viewer_ui_actor(user_lease, browser):
+    """
+    UI-Optimized Fixture for VIEWER:
+    1. Leases VIEWER.
+    2. Ensures UI Session (SmartUIAuth).
+    3. Returns {user, page, api}
+    
+    NOTE: No seed data creation for Viewer (read-only role).
+    """
+    lease_user = user_lease.acquire("VIEWER")
+    
+    # 1. API Auth (for verification only)
+    api_auth = SmartAuth(lease_user['email'], lease_user['password'])
+    token, auth_user = api_auth.authenticate()
+    api = APIClient(token=token)
+    
+    # 2. UI Auth (Reuse State)
+    ui_auth = SmartUIAuth(lease_user['email'], lease_user['password'], browser)
+    state_path = ui_auth.get_storage_state()
+    
+    # 3. Create Context
+    context = browser.new_context(storage_state=state_path)
+    page = context.new_page()
+    
+    actor = {
+        "user": auth_user,
+        "password": lease_user['password'],
+        "token": token,
+        "api": api,
+        "page": page,
+        "context": context
+    }
+    
+    # NO SEED HEALING FOR VIEWER (read-only role)
+    
+    yield actor
+    
+    context.close()
+

@@ -3,7 +3,7 @@
         {
             "email": "admin1@test.com",
             "password": "Test123!@#",
-            "reserved_by": null
+            "reserved_by": "master"
         },
         {
             "email": "admin2@test.com",
@@ -17,7 +17,8 @@
         },
         {
             "email": "admin4@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "admin5@test.com",
@@ -76,7 +77,8 @@
     "VIEWER": [
         {
             "email": "viewer1@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "viewer2@test.com",
