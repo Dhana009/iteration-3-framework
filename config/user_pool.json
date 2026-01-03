@@ -8,7 +8,7 @@
         {
             "email": "admin2@test.com",
             "password": "Test123!@#",
-            "reserved_by": null
+            "reserved_by": "gw4"
         },
         {
             "email": "admin3@test.com",
@@ -22,15 +22,18 @@
         },
         {
             "email": "admin5@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "admin6@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "admin7@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "admin8@test.com",
