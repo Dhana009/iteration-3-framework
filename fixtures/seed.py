@@ -116,11 +116,28 @@ SEED_ITEMS = [
     }
 ]
 
+# Track which users have been cleaned in this process/session
+CLEANED_USERS = set()
+
 def check_and_heal_seed(client, user_id):
     """
     Ensures that the SEED_ITEMS exist for the current user.
-    Uses 'Trust But Verify'.
+    
+    Behavior:
+    - If CLEANUP_SEED_ON_START=true: Clean existing seed data ONCE per session per user.
+    - Then proceeds to 'Trust But Verify' (create missing items).
     """
+    import os
+    
+    # Check env var directly
+    cleanup_enabled = os.environ.get('CLEANUP_SEED_ON_START', 'false').lower() == 'true'
+    
+    if cleanup_enabled and user_id not in CLEANED_USERS:
+        print(f"[SeedHealer] CLEANUP_SEED_ON_START=true. Cleaning seed data for {user_id} (Once per session)...")
+        _cleanup_user_seed_data(client, user_id)
+        CLEANED_USERS.add(user_id)
+        print(f"[SeedHealer] Cleanup complete for {user_id}. Recreating seed data...")
+
     print(f"[SeedHealer] Verifying baseline data for {user_id}...")
     
     # 1. Fetch ALL items for this user (Active + Inactive)
@@ -203,3 +220,58 @@ def ensure_seed_data(auth_context):
     
     check_and_heal_seed(client, user_id)
     return True
+
+
+def _cleanup_user_seed_data(client, user_id: str):
+    """
+    Delete all seed items for a specific user using MongoDB DIRECTLY.
+    This ensures a hard delete/clean slate, not a soft delete via API.
+    """
+    try:
+        from pymongo import MongoClient
+        import os
+    except ImportError:
+        print("[SeedHealer] ❌ pymongo not installed. Skipping direct cleanup.")
+        return
+
+    mongo_uri = os.environ.get('MONGODB_URI')
+    db_name = os.environ.get('MONGODB_DB_NAME', 'test') # Default to 'test' based on .env
+    
+    if not mongo_uri:
+        print("[SeedHealer] ❌ MONGODB_URI not set. Skipping direct cleanup.")
+        return
+
+    user_suffix = user_id[-4:]
+    print(f"[SeedHealer] 🧹 connecting to MongoDB to clean items for suffix '{user_suffix}'...")
+    
+    try:
+        with MongoClient(mongo_uri) as mongo_client:
+            db = mongo_client[db_name]
+            items_collection = db['items']
+            
+            # Construct query: Name contains "Seed Item" AND ends with " - {user_suffix}"
+            # Using regex for flexible matching similar to previous logic
+            query = {
+                "name": {"$regex": f"Seed Item.* - {user_suffix}$"}
+            }
+            
+            # Count before delete
+            count = items_collection.count_documents(query)
+            
+            if count == 0:
+                 print(f"[SeedHealer] No existing seed data found in MongoDB for {user_suffix}. (0 items to clean)")
+                 return
+
+            print(f"[SeedHealer] 🔍 Found {count} existing seed items in MongoDB for {user_suffix}. Deleting...")
+            
+            # Delete
+            result = items_collection.delete_many(query)
+            print(f"[SeedHealer] ✅ Hard deleted {result.deleted_count} items from MongoDB for {user_suffix}.")
+            
+            if result.deleted_count != count:
+                print(f"[SeedHealer] ⚠️  WARNING: Deleted count ({result.deleted_count}) != Found count ({count})")
+            
+    except Exception as e:
+        print(f"[SeedHealer] ❌ MongoDB Cleanup Failed: {str(e)}")
+        # We generally don't want to crash the test if cleanup fails, but it might lead to 409s later.
+        # Allowing it to proceed to see if API update handles it.

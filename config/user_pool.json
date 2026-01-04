@@ -44,7 +44,7 @@
         {
             "email": "editor1@test.com",
             "password": "Test123!@#",
-            "reserved_by": null
+            "reserved_by": "master"
         },
         {
             "email": "editor2@test.com",
@@ -58,11 +58,13 @@
         },
         {
             "email": "editor4@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "editor5@test.com",
-            "password": "Test123!@#"
+            "password": "Test123!@#",
+            "reserved_by": null
         },
         {
             "email": "editor6@test.com",
