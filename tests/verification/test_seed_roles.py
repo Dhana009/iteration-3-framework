@@ -1,5 +1,5 @@
 import pytest
-from lib.seed import check_and_heal_seed, SEED_ITEMS
+from lib.seed import SEED_ITEMS
 from lib.auth import SmartAuth
 from utils.api_client import APIClient
 

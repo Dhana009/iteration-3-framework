@@ -2,7 +2,6 @@ import pytest
 import os
 from lib.users import UserLease
 from lib.auth import SmartAuth
-from lib.seed import check_and_heal_seed
 from utils.api_client import APIClient
 
 @pytest.fixture(scope="session", autouse=True)
@@ -39,34 +38,5 @@ def setup_mongodb_seed(env_config, create_seed_for_user):
     
     print(f"[SeedSetup] ✅ Total: {total_items} items created for {len(user_emails)} users")
 
-# OLD FIXTURE - DISABLED (replaced by setup_mongodb_seed)
-# Kept for backward compatibility if needed
-@pytest.fixture(scope="session")  # Removed autouse=True
-def ensure_admin_global_seed(worker_id_val, env_config):
-    """
-    OLD: Session-scoped fixture to ensure Admin's global seed data exists.
-    
-    NOTE: This is now DISABLED (autouse=True removed).
-    The new setup_mongodb_seed fixture handles seed data creation.
-    This fixture is kept for backward compatibility if explicitly called.
-    """
-    print("\n[GlobalSeed-OLD] Running old seed healer (should not see this)...")
-    
-    # 1. Lease admin1 temporarily
-    lease = UserLease(worker_id_val)
-    admin_user = lease.acquire("ADMIN")
-    
-    try:
-        # 2. Authenticate
-        base_url = env_config.API_BASE_URL
-        auth = SmartAuth(admin_user['email'], admin_user['password'], base_url)
-        token, user_data = auth.authenticate()
-        api = APIClient(base_url, token=token)
-        
-        # 3. Heal seed data
-        check_and_heal_seed(api, user_data['_id'])
-        
-        print(f"[GlobalSeed-OLD] Admin seed verified for {admin_user['email']}")
-    finally:
-        # 4. Release admin
-        lease.release()
+# OLD FIXTURE REMOVED - Replaced by setup_mongodb_seed
+# The old API-based seed healing approach has been replaced with MongoDB direct insertion

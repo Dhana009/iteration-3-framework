@@ -1,7 +1,6 @@
 import pytest
 from lib.auth import SmartAuth
 from lib.ui_auth import SmartUIAuth
-from lib.seed import check_and_heal_seed
 from utils.api_client import APIClient
 
 @pytest.fixture(scope="function")

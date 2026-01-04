@@ -7,7 +7,7 @@ import sys
 import json
 from pathlib import Path
 from lib.auth import SmartAuth
-from lib.seed import check_and_heal_seed, SEED_ITEMS
+from lib.seed import SEED_ITEMS
 from utils.api_client import APIClient
 from utils.config import ProductionConfig # Default to prod for standalone check
 

@@ -6,6 +6,7 @@ Purpose: Provide factory fixtures for MongoDB operations (create/delete seed dat
 
 import pytest
 import os
+from datetime import datetime
 from pymongo import MongoClient
 from typing import Callable
 
@@ -47,8 +48,10 @@ def create_seed_for_user(mongodb_connection) -> Callable:
     Usage:
         count = create_seed_for_user("editor1@test.com")
     """
+    from lib.seed import SEED_ITEMS
+    from pymongo.errors import BulkWriteError
+
     def _create(user_email: str) -> int:
-        from lib.seed import SEED_ITEMS
         
         # Get user ID from MongoDB
         user = mongodb_connection.users.find_one({"email": user_email})
@@ -57,27 +60,43 @@ def create_seed_for_user(mongodb_connection) -> Callable:
         
         user_id = str(user['_id'])
         
-        # CHECK: Do seed items already exist for this user?
-        existing_seed_count = mongodb_connection.items.count_documents({
+        # Optimized Check: Limit query to verify if enough items exist
+        # Fetch just enough to confirm we have the required amount (limit=12 for 11 items)
+        existing_items = list(mongodb_connection.items.find({
             'created_by': user_id,
-            'tags': 'seed'
-        })
+            'tags': {'$in': ['seed']}
+        }).limit(len(SEED_ITEMS) + 1))
         
-        if existing_seed_count >= len(SEED_ITEMS):
-            print(f"[MongoDB] Seed data already exists for {user_email} ({existing_seed_count} items)")
-            return existing_seed_count
+        if len(existing_items) >= len(SEED_ITEMS):
+             # If we hit the limit, there might be more items. Get exact count for accuracy.
+             if len(existing_items) > len(SEED_ITEMS):
+                 true_count = mongodb_connection.items.count_documents({
+                    'created_by': user_id,
+                    'tags': {'$in': ['seed']}
+                 })
+                 print(f"[MongoDB] Seed data already exists for {user_email} ({true_count} items)")
+                 return true_count
+             
+             # Otherwise we have exactly the count we found
+             print(f"[MongoDB] Seed data already exists for {user_email} (found {len(existing_items)} items)")
+             return len(existing_items)
         
-        # Prepare seed items with created_by and tags
-        # Make items unique per user by adding user ID suffix
-        user_id_suffix = user_id[-4:]  # Last 4 chars of user ID
-        items_to_insert = []
-        for item in SEED_ITEMS:
-            item_copy = item.copy()
-            # Add user suffix to name for uniqueness
-            item_copy['name'] = f"{item['name']} - {user_id_suffix}"
-            item_copy['created_by'] = user_id
-            item_copy['tags'] = ['seed', 'v1.0']
-            items_to_insert.append(item_copy)
+        # Prepare seed items with list comprehension
+        user_id_suffix = user_id[-4:]
+        items_to_insert = [
+            {
+                **item,
+                'name': f"{item['name']} - {user_id_suffix}",
+                'created_by': user_id,
+                'tags': ['seed', 'v1.0'],
+                'is_active': item.get('is_active', True), # Default to Active if not specified
+                'normalizedName': f"{item['name']} - {user_id_suffix}".lower(),
+                'normalizedCategory': item['category'].lower() if 'category' in item else None,
+                'createdAt': datetime.utcnow(),
+                'updatedAt': datetime.utcnow()
+            }
+            for item in SEED_ITEMS
+        ]
         
         # Bulk insert
         try:
@@ -85,20 +104,27 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             count = len(result.inserted_ids)
             print(f"[MongoDB] Created {count} seed items for {user_email}")
             return count
-        except Exception as e:
-            # If some items already exist, count what we have
+        except BulkWriteError as e:
+             # Handle partial insertions (some duplicates)
+            count = e.details['nInserted']
+            print(f"[MongoDB] Partial seed creation for {user_email} ({count} new items)")
+            print(f"[MongoDB] Write Errors: {e.details.get('writeErrors')}")
+            
+            # Verify final state
             final_count = mongodb_connection.items.count_documents({
                 'created_by': user_id,
-                'tags': 'seed'
+                'tags': {'$in': ['seed']}
             })
-            print(f"[MongoDB] Seed setup complete for {user_email} ({final_count} items, some may have existed)")
             return final_count
+        except Exception as e:
+            print(f"[MongoDB] Error creating seed for {user_email}: {e}")
+            raise
     
     return _create
 
 
-@pytest.fixture
-def delete_user_data() -> Callable:
+@pytest.fixture(scope="session")
+def delete_user_data(mongodb_connection) -> Callable:
     """
     Factory fixture: Delete all data for user via backend API
     
@@ -111,48 +137,37 @@ def delete_user_data() -> Callable:
     def _delete(user_email: str, base_url: str, internal_key: str) -> bool:
         import requests
         
-        # Get MongoDB connection
-        uri = os.getenv('MONGODB_URI')
-        db_name = os.getenv('MONGODB_DB_NAME')
+        # Reuse existing connection
+        user = mongodb_connection.users.find_one({"email": user_email})
+        if not user:
+            print(f"[Cleanup] User not found: {user_email}")
+            return False
+            
+        user_id = str(user['_id'])
+            
+        # Call backend cleanup endpoint
+        url = f"{base_url}/api/v1/internal/users/{user_id}/data"
+        headers = {'x-internal-key': internal_key}
         
-        client = MongoClient(uri)
-        db = client[db_name]
+        print(f"[Cleanup] Deleting data for {user_email}...")
+        response = requests.delete(url, headers=headers)
         
-        try:
-            # Get user ID
-            user = db.users.find_one({"email": user_email})
-            if not user:
-                print(f"[Cleanup] User not found: {user_email}")
-                return False
-            
-            user_id = str(user['_id'])
-            
-            # Call backend cleanup endpoint
-            url = f"{base_url}/api/v1/internal/users/{user_id}/data"
-            headers = {'x-internal-key': internal_key}
-            
-            print(f"[Cleanup] Deleting data for {user_email}...")
-            response = requests.delete(url, headers=headers)
-            
-            if response.status_code == 200:
-                result = response.json()
-                deleted = result.get('deleted', {})
-                print(f"[Cleanup] ✅ Deleted: {deleted.get('items', 0)} items, "
-                      f"{deleted.get('files', 0)} files, "
-                      f"{deleted.get('bulk_jobs', 0)} jobs")
-                return True
-            else:
-                print(f"[Cleanup] ⚠️  Failed: {response.status_code}")
-                return False
-                
-        finally:
-            client.close()
+        if response.status_code == 200:
+            result = response.json()
+            deleted = result.get('deleted', {})
+            print(f"[Cleanup] ✅ Deleted: {deleted.get('items', 0)} items, "
+                  f"{deleted.get('files', 0)} files, "
+                  f"{deleted.get('bulk_jobs', 0)} jobs")
+            return True
+        else:
+            print(f"[Cleanup] ⚠️  Failed: {response.status_code}")
+            return False
     
     return _delete
 
 
-@pytest.fixture
-def delete_user_items() -> Callable:
+@pytest.fixture(scope="session")
+def delete_user_items(mongodb_connection) -> Callable:
     """
     Factory fixture: Delete only items for user via backend API
     (Preserves bulk jobs, activity logs, OTPs, user record)
@@ -166,43 +181,31 @@ def delete_user_items() -> Callable:
     def _delete_items(user_email: str, base_url: str, internal_key: str) -> bool:
         import requests
         
-        # Get MongoDB connection
-        uri = os.getenv('MONGODB_URI')
-        db_name = os.getenv('MONGODB_DB_NAME')
+        # Reuse existing connection
+        user = mongodb_connection.users.find_one({"email": user_email})
+        if not user:
+            print(f"[Cleanup] User not found: {user_email}")
+            return False
+            
+        user_id = str(user['_id'])
+            
+        # Call items-only cleanup endpoint
+        url = f"{base_url}/api/v1/internal/users/{user_id}/items"
+        headers = {'x-internal-key': internal_key}
         
-        client = MongoClient(uri)
-        db = client[db_name]
+        print(f"[Cleanup] Deleting items for {user_email}...")
+        response = requests.delete(url, headers=headers)
         
-        try:
-            # Get user ID
-            user = db.users.find_one({"email": user_email})
-            if not user:
-                print(f"[Cleanup] User not found: {user_email}")
-                return False
-            
-            user_id = str(user['_id'])
-            
-            # Call items-only cleanup endpoint
-            url = f"{base_url}/api/v1/internal/users/{user_id}/items"
-            headers = {'x-internal-key': internal_key}
-            
-            print(f"[Cleanup] Deleting items for {user_email}...")
-            response = requests.delete(url, headers=headers)
-            
-            if response.status_code == 200:
-                result = response.json()
-                deleted = result.get('deleted', {})
-                preserved = result.get('preserved', {})
-                print(f"[Cleanup] ✅ Deleted: {deleted.get('items', 0)} items, "
-                      f"{deleted.get('files', 0)} files")
-                print(f"[Cleanup] ✅ Preserved: user, bulk_jobs, activity_logs, otps")
-                return True
-            else:
-                print(f"[Cleanup] ⚠️  Failed: {response.status_code}")
-                return False
-                
-        finally:
-            client.close()
+        if response.status_code == 200:
+            result = response.json()
+            deleted = result.get('deleted', {})
+            print(f"[Cleanup] ✅ Deleted: {deleted.get('items', 0)} items, "
+                  f"{deleted.get('files', 0)} files")
+            print(f"[Cleanup] ✅ Preserved: user, bulk_jobs, activity_logs, otps")
+            return True
+        else:
+            print(f"[Cleanup] ⚠️  Failed: {response.status_code}")
+            return False
     
     return _delete_items
 

@@ -3,6 +3,10 @@ import pytest
 from pathlib import Path
 from utils.config import get_config
 from playwright.sync_api import Browser
+from dotenv import load_dotenv
+
+# Load env vars
+load_dotenv()
 
 # Ensure root dir is in path for imports
 ROOT_DIR = Path(__file__).parent.parent
@@ -17,6 +21,7 @@ pytest_plugins = [
     "tests.plugins.actors_ui",
     "tests.plugins.pages",
     "tests.plugins.mongodb_fixtures",
+    "tests.plugins.seed_fixtures",
     "tests.plugins.api_fixtures",
     "pytest_playwright",
 ]
