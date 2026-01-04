@@ -40,10 +40,41 @@ class SmartUIAuth:
 
     def _is_state_valid(self):
         """
-        Checks if state file exists.
-        Future: Could load it and check expiry timestamp.
+        Validates state by attempting to use it.
+        Creates a test context and checks if we're still authenticated.
+        Similar to SmartAuth's token validation approach.
         """
-        return self.state_path.exists()
+        if not self.state_path.exists():
+            return False
+        
+        try:
+            # Create a test context with the state
+            context = self.browser.new_context(storage_state=str(self.state_path), base_url=self.base_url)
+            page = context.new_page()
+            
+            # Try to navigate to a protected page (dashboard is typically protected)
+            # Using a short timeout to fail fast if state is invalid
+            page.goto(f"{self.base_url}/dashboard", wait_until="domcontentloaded", timeout=5000)
+            
+            # Check if we're redirected to login (means invalid state)
+            current_url = page.url
+            is_valid = "/login" not in current_url.lower()
+            
+            context.close()
+            
+            if not is_valid:
+                print(f"[SmartUIAuth] State for {self.email} is EXPIRED (redirected to login)")
+                # Clean up expired state
+                self.state_path.unlink()
+            
+            return is_valid
+            
+        except Exception as e:
+            # Any error means state is invalid (network issues, timeout, etc.)
+            print(f"[SmartUIAuth] State validation failed for {self.email}: {e}")
+            if self.state_path.exists():
+                self.state_path.unlink()
+            return False
 
     def _login_and_save(self):
         """

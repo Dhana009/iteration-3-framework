@@ -1,8 +1,8 @@
-import os
 import json
 from utils.api_client import APIClient
+from pathlib import Path
 
-STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'state')
+STATE_DIR = Path(__file__).parent.parent / 'state'
 
 class SmartAuth:
     # Endpoint Constants
@@ -13,7 +13,7 @@ class SmartAuth:
         self.email = user_email
         self.password = user_password
         self.base_url = base_url
-        self.state_file = os.path.join(STATE_DIR, f"{self.email}.json")
+        self.state_file = STATE_DIR / f"{self.email}.json"
         self.token = None
         self.user_data = None
 
@@ -25,7 +25,7 @@ class SmartAuth:
         3. Fast Track (Login if needed)
         """
         # Step 1: Try to load existing state
-        if os.path.exists(self.state_file):
+        if self.state_file.exists():
             try:
                 with open(self.state_file, 'r') as f:
                     data = json.load(f)
