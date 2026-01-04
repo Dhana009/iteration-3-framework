@@ -1,0 +1,28 @@
+{
+    "ADMIN": [
+        {
+            "email": "admin1@test.com",
+            "password": "REPLACE_WITH_PASSWORD",
+            "reserved_by": null
+        },
+        {
+            "email": "admin2@test.com",
+            "password": "REPLACE_WITH_PASSWORD",
+            "reserved_by": null
+        }
+    ],
+    "EDITOR": [
+        {
+            "email": "editor1@test.com",
+            "password": "REPLACE_WITH_PASSWORD",
+            "reserved_by": null
+        }
+    ],
+    "VIEWER": [
+        {
+            "email": "viewer1@test.com",
+            "password": "REPLACE_WITH_PASSWORD",
+            "reserved_by": null
+        }
+    ]
+}

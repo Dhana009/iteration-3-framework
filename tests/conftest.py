@@ -255,3 +255,40 @@ def viewer_ui_actor(user_lease, browser):
     
     context.close()
 
+
+# ---------- Page Object Factory ----------
+
+class PageFactory:
+    """
+    Lazy-loading factory for Page Objects.
+    Usage: pages.login_page.do_login()
+    """
+    def __init__(self, page):
+        self.page = page
+        self._login_page = None
+        self._create_item = None
+        # Add future pages here
+
+    @property
+    def create_item(self):
+        # Lazy import to avoid circular dep
+        from tests.pages.create_item_page import CreateItemPage
+        if not self._create_item:
+            self._create_item = CreateItemPage(self.page)
+        return self._create_item
+
+    # Example for Login Page (if we add it later)
+    # @property
+    # def login(self):
+    #     if not self._login_page:
+    #         self._login_page = LoginPage(self.page)
+    #     return self._login_page
+
+
+@pytest.fixture
+def pages(page):
+    """
+    Fixture that returns a PageFactory.
+    Requires the standard playwright 'page' fixture.
+    """
+    return PageFactory(page)

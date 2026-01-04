@@ -1,0 +1,57 @@
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
+
+# Logs
+*.log
+*.txt
+capacity_log.txt
+healing_log.txt
+seed_log.txt
+smoke_log.txt
+smoke_log_v2.txt
+ui_test_log.txt
+ui_test_log_2.txt
+ui_test_log_editor.txt
+parallel_log.txt
+cleanup_verification.txt
+pagination_debug.txt
+physical_test_debug.txt
+flow3_test_results.txt
+
+# VS Code
+.vscode/
+
+# Brain/Artifacts (if local only)
+.agent/
+brain/
+
+# System
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Session State
+state/
+
+# Local Config (contains secrets/locks)
+config/user_pool.json
+
+
