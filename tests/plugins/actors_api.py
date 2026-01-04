@@ -24,8 +24,8 @@ def admin_actor(user_lease, env_config):
         "api": APIClient(base_url, token=token)
     }
     
-    # Auto-Heal Seed
-    check_and_heal_seed(context['api'], auth_user['_id'])
+    # Auto-Heal Seed - DISABLED (MongoDB seed setup handles this)
+    # check_and_heal_seed(context['api'], auth_user['_id'])
     
     return context
 
@@ -46,7 +46,8 @@ def editor_actor(user_lease, env_config):
         "api": APIClient(base_url, token=token)
     }
     
-    check_and_heal_seed(context['api'], auth_user['_id'])
+    # Auto-Heal Seed - DISABLED (MongoDB seed setup handles this)
+    # check_and_heal_seed(context['api'], auth_user['_id'])
     return context
 
 @pytest.fixture(scope="function")

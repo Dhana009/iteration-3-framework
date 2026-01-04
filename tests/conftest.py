@@ -15,6 +15,8 @@ pytest_plugins = [
     "tests.plugins.actors_api",
     "tests.plugins.actors_ui",
     "tests.plugins.pages",
+    "tests.plugins.mongodb_fixtures",
+    "tests.plugins.api_fixtures",
 ]
 
 def pytest_addoption(parser):

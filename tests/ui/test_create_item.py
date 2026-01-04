@@ -5,15 +5,45 @@ from lib.pages.create_item_page import CreateItemPage
 
 @pytest.mark.parametrize("load_index", range(1)) 
 @pytest.mark.parametrize("actor_fixture", ["admin_ui_actor", "editor_ui_actor"])
-def test_create_digital_item(actor_fixture, load_index, request, env_config):
+def test_create_digital_item(actor_fixture, load_index, request, env_config, create_test_item, delete_test_item):
     """
     Flow 2: Create DIGITAL Item (Software category)
     Uses POM (CreateItemPage) for interactions.
+    Also verifies API fixtures integration (create/delete ephemeral data).
     """
     actor = request.getfixturevalue(actor_fixture)
     api = actor['api']
     page = actor['page'] # Authenticated page
     frontend_base_url = env_config.FRONTEND_BASE_URL
+    
+    # --- Integration verification: API Fixtures ---
+    print("\n[Flow 2 Integration] Creating ephemeral test item via API fixture...")
+    ephemeral_item = create_test_item(api, {
+        "name": f"Ephemeral Test {uuid.uuid4().hex[:6]}",
+        "description": "Background item for fixture verification",
+        "item_type": "DIGITAL",
+        "price": 1.00,
+        "category": "Testing",
+        "download_url": "https://example.com/test-file.zip",
+        "file_size": 1024
+    })
+    
+    # Verify ephemeral item exists
+    assert ephemeral_item is not None
+    print(f"[Flow 2 Integration] Created ephemeral item: {ephemeral_item['_id']}")
+    
+    # Delete immediately to verify cleanup
+    print(f"[Flow 2 Integration] Cleaning up ephemeral item via API fixture...")
+    delete_test_item(api, ephemeral_item['_id'])
+    
+    # Verify deletion
+    check = api.get(f"/items/{ephemeral_item['_id']}")
+    if check.status_code == 200:
+        assert check.json()['data'].get('is_active') is False
+    else:
+        assert check.status_code == 404
+    print("[Flow 2 Integration] Ephemeral item cleanup verified.")
+    # ----------------------------------------------
     
     # Initialize POM
     create_page = CreateItemPage(page)
@@ -43,6 +73,9 @@ def test_create_digital_item(actor_fixture, load_index, request, env_config):
     create_page.navigate(f"{frontend_base_url}/items/create")
     if "login" in page.url:
          raise RuntimeError("SmartUIAuth Failed: Redirected to Login")
+    
+    print("[UI] Waiting for page ready...")
+    create_page.wait_for_ready()
     
     # 3. Form Interaction via POM
     print("[UI] Filling Form via POM...")

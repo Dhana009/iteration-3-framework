@@ -34,6 +34,10 @@ class CreateItemPage(BasePage):
 
     # --- Actions ---
 
+    def wait_for_ready(self, timeout=10000):
+        """Waits for the page to be ready (Name input visible)."""
+        self.get_by_test_id(self.NAME_INPUT).wait_for(state="visible", timeout=timeout)
+
     def fill_common_fields(self, name: str, description: str, price: str, category: str):
         """Fills the fields common to all item types."""
         self.get_by_test_id(self.NAME_INPUT).fill(name)

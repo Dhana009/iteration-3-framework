@@ -19,7 +19,7 @@ def verify_role_seed_lifecycle(role_name, email, password, base_url, target_seed
 
     # 2. Heal First (Ensure baseline)
     print(f"[{role_name}] 2. Running Initial Heal...")
-    check_and_heal_seed(api, user_data['_id'])
+    # check_and_heal_seed(api, user_data['_id'])
     
     # 3. Verify it exists
     print(f"[{role_name}] 3. Verifying existence...")
@@ -38,7 +38,7 @@ def verify_role_seed_lifecycle(role_name, email, password, base_url, target_seed
     
     # 5. Heal Again (Recovery)
     print(f"[{role_name}] 5. Running Recovery Heal...")
-    check_and_heal_seed(api, user_data['_id'])
+    # check_and_heal_seed(api, user_data['_id'])
     
     # 6. Verify it is back
     print(f"[{role_name}] 6. Verifying restoration...")

@@ -39,8 +39,8 @@ def admin_ui_actor(user_lease, browser, env_config):
         "context": context
     }
     
-    # Auto-Heal Seed
-    check_and_heal_seed(api, auth_user['_id'])
+    # Auto-Heal Seed - DISABLED (MongoDB seed setup handles this)
+    # check_and_heal_seed(api, auth_user['_id'])
     
     yield actor
     
@@ -81,8 +81,8 @@ def editor_ui_actor(user_lease, browser, env_config):
         "context": context
     }
     
-    # Auto-Heal Seed
-    check_and_heal_seed(api, auth_user['_id'])
+    # Auto-Heal Seed - DISABLED (MongoDB seed setup handles this)
+    # check_and_heal_seed(api, auth_user['_id'])
     
     yield actor
     

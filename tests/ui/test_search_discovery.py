@@ -40,13 +40,21 @@ def test_viewer_can_view_items_list(viewer_ui_actor, env_config):
     print("[Flow3-Viewer] SUCCESS.")
 
 
-def test_editor_search_by_name(editor_ui_actor, env_config):
+def test_editor_search_by_name(editor_ui_actor, env_config, create_seed_for_user):
     """
     Flow 3: Editor - Search Functionality
+    Uses fixture to ensure unique seed data availability.
     """
     actor = editor_ui_actor
     page = actor['page']
     frontend_base_url = env_config.FRONTEND_BASE_URL
+    user_email = actor['user']['email']
+    
+    # --- Integration verification: Seed Fixture ---
+    print(f"\n[Flow 3 Integration] Ensuring seed data for {user_email}...")
+    seed_count = create_seed_for_user(user_email)
+    print(f"[Flow 3 Integration] Seed count verified: {seed_count}")
+    # ----------------------------------------------
     
     search_page = SearchPage(page)
     

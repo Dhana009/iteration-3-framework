@@ -46,3 +46,55 @@ def test_crud_lifecycle_admin(admin_actor):
         assert resp.status_code == 404
 
     print("\n[Smoke] SUCCESS: Infinite Reliability Achieved.")
+
+
+def test_crud_with_fixtures(admin_actor, create_test_item, delete_test_item):
+    """
+    NEW: Test using new fixtures
+    
+    Demonstrates:
+    1. Create item via create_test_item fixture
+    2. Verify item exists
+    3. Delete item via delete_test_item fixture
+    4. Verify deletion
+    """
+    client = admin_actor['api']
+    
+    print("\n[Smoke-Fixtures] Creating item via fixture...")
+    
+    # 1. CREATE using fixture (with unique name to avoid 409)
+    item = create_test_item(client, {
+        "name": f"Smoke Test with Fixture {uuid.uuid4().hex[:6]}",
+        "description": "Testing new fixture integration in smoke tests",
+        "item_type": "DIGITAL",
+        "price": 9.99,
+        "category": "Testing",
+        "download_url": "https://example.com/fixture-test",
+        "file_size": 512
+    })
+    
+    assert item is not None
+    assert 'test-data' in item['tags']
+    item_id = item['_id']
+    print(f"[Smoke-Fixtures] Created: {item['name']} (ID: {item_id})")
+    
+    # 2. VERIFY
+    print(f"[Smoke-Fixtures] Verifying {item_id}...")
+    resp = client.get(f"/items/{item_id}")
+    assert resp.status_code == 200
+    assert resp.json()['data']['_id'] == item_id
+    
+    # 3. DELETE using fixture
+    print(f"[Smoke-Fixtures] Deleting via fixture...")
+    success = delete_test_item(client, item_id)
+    assert success
+    
+    # 4. VERIFY DELETION
+    print(f"[Smoke-Fixtures] Verifying deletion...")
+    resp = client.get(f"/items/{item_id}")
+    if resp.status_code == 200:
+        assert resp.json()['data'].get('is_active') is False
+    else:
+        assert resp.status_code == 404
+    
+    print("\n[Smoke-Fixtures] SUCCESS: New fixtures working in smoke tests!")

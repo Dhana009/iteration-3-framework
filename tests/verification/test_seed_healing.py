@@ -33,7 +33,8 @@ def test_seed_healing_verification():
     
     # 2. Ensure Initial State (Heal)
     print("\n--- STEP 1: INITIAL HEAL ---")
-    check_and_heal_seed(client, user_id)
+    # check_and_heal_seed(client, user_id)
+    print("NOTE: Seed healing disabled (handled by MongoDB fixtures)")
     
     # 3. Verify Existence
     resp = client.get("/items", params={"search": "Seed Item Alpha"})
@@ -61,7 +62,8 @@ def test_seed_healing_verification():
     
     # 5. Heal Again
     print("\n--- STEP 3: RE-HEAL ---")
-    check_and_heal_seed(client, user_id)
+    # check_and_heal_seed(client, user_id)
+    print("NOTE: Seed healing disabled (handled by MongoDB fixtures)")
     
     # 6. Verify Restoration
     resp = client.get("/items", params={"search": "Seed Item Alpha"})

@@ -1,5 +1,11 @@
 import pytest
 import time
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 SEED_ITEMS = [
     # Item 1: Alpha - Electronics, PHYSICAL (was DIGITAL - FIXED), Active, $25
@@ -127,10 +133,8 @@ def check_and_heal_seed(client, user_id):
     - If CLEANUP_SEED_ON_START=true: Clean existing seed data ONCE per session per user.
     - Then proceeds to 'Trust But Verify' (create missing items).
     """
-    import os
-    
-    # Check env var directly
-    cleanup_enabled = os.environ.get('CLEANUP_SEED_ON_START', 'false').lower() == 'true'
+    # Check env var (loaded from .env file via dotenv)
+    cleanup_enabled = os.getenv('CLEANUP_SEED_ON_START', 'false').lower() == 'true'
     
     if cleanup_enabled and user_id not in CLEANED_USERS:
         print(f"[SeedHealer] CLEANUP_SEED_ON_START=true. Cleaning seed data for {user_id} (Once per session)...")
@@ -231,13 +235,12 @@ def _cleanup_user_seed_data(client, user_id: str):
     """
     try:
         from pymongo import MongoClient
-        import os
     except ImportError:
         print("[SeedHealer] ❌ pymongo not installed. Skipping direct cleanup.")
         return
 
-    mongo_uri = os.environ.get('MONGODB_URI')
-    db_name = os.environ.get('MONGODB_DB_NAME', 'test') # Default to 'test' based on .env
+    mongo_uri = os.getenv('MONGODB_URI')
+    db_name = os.getenv('MONGODB_DB_NAME', 'test') # Default to 'test' based on .env
     
     if not mongo_uri:
         print("[SeedHealer] ❌ MONGODB_URI not set. Skipping direct cleanup.")
