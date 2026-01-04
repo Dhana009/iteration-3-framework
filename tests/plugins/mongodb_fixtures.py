@@ -46,12 +46,30 @@ def create_seed_for_user(mongodb_connection) -> Callable:
         Function that creates seed data for a user email
         
     Usage:
+        # Use default seed items
         count = create_seed_for_user("editor1@test.com")
+        
+        # Use custom seed items
+        custom_items = [...]
+        count = create_seed_for_user("admin1@test.com", seed_items=custom_items)
     """
     from lib.seed import SEED_ITEMS
     from pymongo.errors import BulkWriteError
+    from typing import Optional, List, Dict, Any
 
-    def _create(user_email: str) -> int:
+    def _create(user_email: str, seed_items: Optional[List[Dict[str, Any]]] = None) -> int:
+        """
+        Create seed data for a user
+        
+        Args:
+            user_email: User email address
+            seed_items: Optional list of seed items. If None, uses default SEED_ITEMS
+        
+        Returns:
+            Number of seed items created/existing
+        """
+        # Use provided seed_items or fallback to default
+        items_to_use = seed_items if seed_items is not None else SEED_ITEMS
         
         # Get user ID from MongoDB
         user = mongodb_connection.users.find_one({"email": user_email})
@@ -61,15 +79,15 @@ def create_seed_for_user(mongodb_connection) -> Callable:
         user_id = str(user['_id'])
         
         # Optimized Check: Limit query to verify if enough items exist
-        # Fetch just enough to confirm we have the required amount (limit=12 for 11 items)
+        # Fetch just enough to confirm we have the required amount
         existing_items = list(mongodb_connection.items.find({
             'created_by': user_id,
             'tags': {'$in': ['seed']}
-        }).limit(len(SEED_ITEMS) + 1))
+        }).limit(len(items_to_use) + 1))
         
-        if len(existing_items) >= len(SEED_ITEMS):
+        if len(existing_items) >= len(items_to_use):
              # If we hit the limit, there might be more items. Get exact count for accuracy.
-             if len(existing_items) > len(SEED_ITEMS):
+             if len(existing_items) > len(items_to_use):
                  true_count = mongodb_connection.items.count_documents({
                     'created_by': user_id,
                     'tags': {'$in': ['seed']}
@@ -95,7 +113,7 @@ def create_seed_for_user(mongodb_connection) -> Callable:
                 'createdAt': datetime.utcnow(),
                 'updatedAt': datetime.utcnow()
             }
-            for item in SEED_ITEMS
+            for item in items_to_use
         ]
         
         # Bulk insert
