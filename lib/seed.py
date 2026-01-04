@@ -156,7 +156,7 @@ def check_and_heal_seed(client, user_id):
        
     existing_names = {i['name'] for i in existing_items}
 
-    for seed in SEED_ITEMS:
+    for i, seed in enumerate(SEED_ITEMS, 1):
         # Strategy: Seed items must be unique PER USER to avoid "Shared Baseline" conflicts
         # if the backend isolates by owner.
         # But if the backend enforces Global Uniqueness on Name, we have a problem.
@@ -167,6 +167,8 @@ def check_and_heal_seed(client, user_id):
         # Validation allows: alphanumeric, spaces, hyphens, underscores.
         # Parentheses match failed in parallel run. Swapping to hyphen.
         unique_name = f"{seed['name']} - {user_suffix}"
+        
+        print(f"[SeedHealer] [{i}/{len(SEED_ITEMS)}] Checking '{unique_name}'...")
         
         if unique_name not in existing_names:
             print(f"[SeedHealer] Missing '{unique_name}'. Healing...")

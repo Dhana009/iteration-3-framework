@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 import pytest
-from filelock import FileLock
 from utils.file_lock import AtomicLock
 
 CONFIG_PATH = Path(__file__).parent.parent / 'config' / 'user_pool.json'

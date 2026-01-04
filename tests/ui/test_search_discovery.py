@@ -1,22 +1,24 @@
 import pytest
 import re
-from tests.pages.search_page import SearchPage
+from lib.pages.search_page import SearchPage
 
-def test_viewer_can_view_items_list(viewer_ui_actor):
+def test_viewer_can_view_items_list(viewer_ui_actor, env_config):
     """
     Flow 3: Viewer - Read-Only Access
     """
     actor = viewer_ui_actor
     page = actor['page']
     user = actor['user']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Viewer] Testing read-only access for {user['email']}...")
     
     # 1. Navigate
-    print("[Flow3-Viewer] Navigating to /items...")
-    search_page.navigate("https://testing-box.vercel.app/items")
+    target_url = f"{frontend_base_url}/items"
+    print(f"[Flow3-Viewer] Navigating to {target_url}...")
+    search_page.navigate(target_url)
     search_page.wait_for_ready()
     
     # 2. Verify items visible
@@ -38,18 +40,19 @@ def test_viewer_can_view_items_list(viewer_ui_actor):
     print("[Flow3-Viewer] SUCCESS.")
 
 
-def test_editor_search_by_name(editor_ui_actor):
+def test_editor_search_by_name(editor_ui_actor, env_config):
     """
     Flow 3: Editor - Search Functionality
     """
     actor = editor_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Search] Testing search...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     # Search
@@ -67,18 +70,19 @@ def test_editor_search_by_name(editor_ui_actor):
     print(f"[Flow3-Editor-Search] SUCCESS: Found {count} items.")
 
 
-def test_editor_filter_by_status_active(editor_ui_actor):
+def test_editor_filter_by_status_active(editor_ui_actor, env_config):
     """
     Flow 3: Editor - Filter by Status (Active)
     """
     actor = editor_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Filter] Testing status filter (active)...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     # Filter
@@ -95,17 +99,18 @@ def test_editor_filter_by_status_active(editor_ui_actor):
     print(f"[Flow3-Editor-Filter] SUCCESS: Filtered to {count} active items.")
 
 
-def test_editor_filter_by_status_inactive(editor_ui_actor):
+def test_editor_filter_by_status_inactive(editor_ui_actor, env_config):
     """
     Flow 3: Editor - Filter by Status (Inactive)
     """
     actor = editor_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Filter] Testing status filter (inactive)...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     search_page.filter_by_status("inactive")
@@ -120,17 +125,18 @@ def test_editor_filter_by_status_inactive(editor_ui_actor):
     print(f"[Flow3-Editor-Filter] SUCCESS: Filtered to {count} inactive items.")
 
 
-def test_editor_filter_by_category(editor_ui_actor):
+def test_editor_filter_by_category(editor_ui_actor, env_config):
     """
     Flow 3: Editor - Filter by Category
     """
     actor = editor_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Filter] Testing category filter (Electronics)...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     search_page.filter_by_category("Electronics")
@@ -145,17 +151,18 @@ def test_editor_filter_by_category(editor_ui_actor):
     print(f"[Flow3-Editor-Filter] SUCCESS: Filtered to {count} Electronics items.")
 
 
-def test_editor_sort_by_price_ascending(editor_ui_actor):
+def test_editor_sort_by_price_ascending(editor_ui_actor, env_config):
     """
     Flow 3: Editor - Sort by Price (Ascending)
     """
     actor = editor_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Sort] Testing price sort (ascending)...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     search_page.sort_by_price()
@@ -169,17 +176,18 @@ def test_editor_sort_by_price_ascending(editor_ui_actor):
     print(f"[Flow3-Editor-Sort] SUCCESS: Sorted ${prices[0]} to ${prices[-1]}.")
 
 
-def test_editor_pagination(editor_ui_actor):
+def test_editor_pagination(editor_ui_actor, env_config):
     """
     Flow 3: Editor - Pagination
     """
     actor = editor_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Pagination] Testing pagination...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     # Change limit
@@ -209,17 +217,18 @@ def test_editor_pagination(editor_ui_actor):
     print(f"[Flow3-Editor-Pagination] SUCCESS: Page 2 verified.")
 
 
-def test_admin_full_discovery_flow(admin_ui_actor):
+def test_admin_full_discovery_flow(admin_ui_actor, env_config):
     """
     Flow 3: Admin - Combined Discovery Flow
     """
     actor = admin_ui_actor
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Admin-Combined] Testing full discovery flow...")
     
-    search_page.navigate("https://testing-box.vercel.app/items")
+    search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
     initial = search_page.get_items_count()
@@ -250,4 +259,3 @@ def test_admin_full_discovery_flow(admin_ui_actor):
     assert page.get_by_test_id("item-search").input_value() == ""
     
     print("[Flow3-Admin-Combined] SUCCESS.")
-

@@ -7,13 +7,11 @@ Scenario:
 - Expected: 1 Success, 1 Failure (RuntimeError).
 """
 import sys
-import sys
-import os
 import json
 import multiprocessing
 import time
 from pathlib import Path
-from fixtures.users import UserLease
+from lib.users import UserLease
 
 # Setup Paths
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -67,4 +65,4 @@ def test_capacity_limit_verification():
         # Clear locks if needed (handled by logic)
 
 if __name__ == "__main__":
-    run_verification()
+    test_capacity_limit_verification()

@@ -1,26 +1,8 @@
-from pathlib import Path
-import os
 import requests
 
-# Manual Env Loader to avoid extra dependencies
-def load_env():
-    env_path = Path(__file__).parent.parent / '.env'
-    config = {}
-    if env_path.exists():
-        with open(env_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    config[key.strip()] = value.strip()
-    return config
-
-ENV = load_env()
-BASE_URL = ENV.get('BACKEND_BASE_URL', 'http://localhost:3000/api/v1')
-
 class APIClient:
-    def __init__(self, token=None):
-        self.base_url = BASE_URL
+    def __init__(self, base_url, token=None):
+        self.base_url = base_url
         self.session = requests.Session()
         if token:
             self.session.headers.update({"Authorization": f"Bearer {token}"})

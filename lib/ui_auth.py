@@ -1,8 +1,9 @@
 from pathlib import Path
-import os
-import time
 from playwright.sync_api import Browser, Page
+from lib.pages.login_page import LoginPage
 
+# ROOT_DIR is calculated relative to this file (d:/.../lib/ui_auth.py)
+# Parent is 'lib', Parent.Parent is 'root'
 ROOT_DIR = Path(__file__).parent.parent
 STATE_DIR = ROOT_DIR / 'state'
 
@@ -14,11 +15,12 @@ class SmartUIAuth:
     2. If yes -> Return path (Reuse).
     3. If no -> Perform UI Login -> Save State -> Return path.
     """
-    def __init__(self, email, password, browser: Browser):
+    def __init__(self, email, password, browser: Browser, base_url: str):
         self.email = email
         self.password = password
         self.browser = browser
-        self.state_path = STATE_DIR / f"{email}_storage.json"
+        self.base_url = base_url.rstrip('/') # Validate format
+        self.state_path = STATE_DIR / f"{self.email}_storage.json"
         
         if not STATE_DIR.exists():
             STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -46,19 +48,17 @@ class SmartUIAuth:
     def _login_and_save(self):
         """
         Performs the physical UI login and saves storage state.
+        Uses POM (LoginPage) for maintainability.
         """
         page = self.browser.new_page()
         try:
             print(f"[SmartUIAuth] Navigating to Login...")
-            page.goto("https://testing-box.vercel.app/login")
+            login_page = LoginPage(page)
             
-            # Use verified selectors
-            page.fill('[data-testid="login-email"]', self.email)
-            page.fill('[data-testid="login-password"]', self.password)
-            page.click('[data-testid="login-submit"]')
-            
-            # Wait for success (Dashboard)
-            page.wait_for_url("**/dashboard", timeout=15000)
+            # Using POM methods
+            login_page.navigate(self.base_url)
+            login_page.login(self.email, self.password)
+            login_page.wait_for_success()
             
             # Save State
             page.context.storage_state(path=self.state_path)

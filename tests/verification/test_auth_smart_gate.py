@@ -6,11 +6,11 @@ Scenario:
 2. Reuse Login (Valid state).
 3. Heal Login (Corrupt state).
 """
-import os
 import json
 import time
 from pathlib import Path
-from fixtures.auth import SmartAuth
+from lib.auth import SmartAuth
+from utils.config import ProductionConfig
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 STATE_DIR = ROOT_DIR / 'state'
@@ -41,10 +41,12 @@ def test_auth_smart_gate_verification():
     email, password = get_admin_creds()
     print(f"Testing Auth for {email}...")
     
+    base_url = ProductionConfig.API_BASE_URL
+    
     # 1. Fresh Login
     print("\n--- TEST 1: FRESH LOGIN ---")
     clean_state(email)
-    auth = SmartAuth(email, password)
+    auth = SmartAuth(email, password, base_url)
     t1_start = time.time()
     token1, user1 = auth.authenticate()
     t1_end = time.time()
@@ -56,7 +58,7 @@ def test_auth_smart_gate_verification():
     
     # 2. Reuse Login (Should be fast)
     print("\n--- TEST 2: REUSE LOGIN ---")
-    auth2 = SmartAuth(email, password)
+    auth2 = SmartAuth(email, password, base_url)
     t2_start = time.time()
     token2, user2 = auth2.authenticate()
     t2_end = time.time()
@@ -73,7 +75,7 @@ def test_auth_smart_gate_verification():
     # 3. Heal Login (Corrupt Token)
     print("\n--- TEST 3: HEAL LOGIN ---")
     corrupt_state(email)
-    auth3 = SmartAuth(email, password)
+    auth3 = SmartAuth(email, password, base_url)
     t3_start = time.time()
     token3, user3 = auth3.authenticate()
     t3_end = time.time()
@@ -90,4 +92,4 @@ def test_auth_smart_gate_verification():
     print("\nVERIFICATION SUCCESS: Smart Gate behavior confirmed.")
 
 if __name__ == "__main__":
-    run_verification()
+    test_auth_smart_gate_verification()

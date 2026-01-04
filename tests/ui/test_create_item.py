@@ -1,11 +1,11 @@
 import pytest
 import uuid
 from playwright.sync_api import Page
-from tests.pages.create_item_page import CreateItemPage
+from lib.pages.create_item_page import CreateItemPage
 
-@pytest.mark.parametrize("load_index", range(1)) # Stress Test: Increase range(1) to range(N) for load.
+@pytest.mark.parametrize("load_index", range(1)) 
 @pytest.mark.parametrize("actor_fixture", ["admin_ui_actor", "editor_ui_actor"])
-def test_create_digital_item(actor_fixture, load_index, request):
+def test_create_digital_item(actor_fixture, load_index, request, env_config):
     """
     Flow 2: Create DIGITAL Item (Software category)
     Uses POM (CreateItemPage) for interactions.
@@ -13,6 +13,7 @@ def test_create_digital_item(actor_fixture, load_index, request):
     actor = request.getfixturevalue(actor_fixture)
     api = actor['api']
     page = actor['page'] # Authenticated page
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     
     # Initialize POM
     create_page = CreateItemPage(page)
@@ -39,7 +40,7 @@ def test_create_digital_item(actor_fixture, load_index, request):
 
     # 2. Navigate
     print("[UI] Navigating to Create Page...")
-    create_page.navigate("https://testing-box.vercel.app/items/create")
+    create_page.navigate(f"{frontend_base_url}/items/create")
     if "login" in page.url:
          raise RuntimeError("SmartUIAuth Failed: Redirected to Login")
     
@@ -68,13 +69,14 @@ def test_create_digital_item(actor_fixture, load_index, request):
 
 @pytest.mark.parametrize("load_index", range(1))
 @pytest.mark.parametrize("actor_fixture", ["admin_ui_actor", "editor_ui_actor"])
-def test_create_physical_item(actor_fixture, load_index, request):
+def test_create_physical_item(actor_fixture, load_index, request, env_config):
     """
     Flow 2: Create PHYSICAL Item (Electronics category)
     """
     actor = request.getfixturevalue(actor_fixture)
     api = actor['api']
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     
     create_page = CreateItemPage(page)
     
@@ -92,7 +94,7 @@ def test_create_physical_item(actor_fixture, load_index, request):
     
     print(f"\n[UI-Physical] Starting Flow 2 (POM) for {item_name}...")
 
-    create_page.navigate("https://testing-box.vercel.app/items/create")
+    create_page.navigate(f"{frontend_base_url}/items/create")
     
     create_page.fill_common_fields(
         name=item_name,
@@ -116,13 +118,14 @@ def test_create_physical_item(actor_fixture, load_index, request):
 
 @pytest.mark.parametrize("load_index", range(1))
 @pytest.mark.parametrize("actor_fixture", ["admin_ui_actor", "editor_ui_actor"])
-def test_create_service_item(actor_fixture, load_index, request):
+def test_create_service_item(actor_fixture, load_index, request, env_config):
     """
     Flow 2: Create SERVICE Item (Services category)
     """
     actor = request.getfixturevalue(actor_fixture)
     api = actor['api']
     page = actor['page']
+    frontend_base_url = env_config.FRONTEND_BASE_URL
     
     create_page = CreateItemPage(page)
     
@@ -140,7 +143,7 @@ def test_create_service_item(actor_fixture, load_index, request):
     
     print(f"\n[UI-Service] Starting Flow 2 (POM) for {item_name}...")
 
-    create_page.navigate("https://testing-box.vercel.app/items/create")
+    create_page.navigate(f"{frontend_base_url}/items/create")
     
     create_page.fill_common_fields(
         name=item_name,
@@ -155,4 +158,3 @@ def test_create_service_item(actor_fixture, load_index, request):
     create_page.submit()
     create_page.verify_success()
     print("[UI-Service] SUCCESS.")
-
