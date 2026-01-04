@@ -1,8 +1,8 @@
 def pytest_sessionstart(session):
     """
-    Morning Roll Call: Reset User Pool on Session Start.
+    Morning Roll Call: Reset User State on Session Start.
     Runs ONLY on the Master node (before workers start).
-    Ensures recovery from previous crashes by un-reserving all users.
+    Ensures recovery from previous crashes by clearing the state file.
     """
     if not hasattr(session.config, 'workerinput'):
         # Inline imports for safety
@@ -12,32 +12,16 @@ def pytest_sessionstart(session):
         
         # Robust path resolution using pytest's rootdir
         root = Path(session.config.rootdir)
-        config_path = root / 'config' / 'user_pool.json'
-        # AtomicLock expects Union[str, Path], so we can pass Path directly now
+        state_path = root / 'config' / 'user_state.json'
         lock_path = root / 'config' / 'user_pool.lock'
         
-        if not config_path.exists():
-            print(f"[Morning Roll Call] Config not found at {config_path}")
-            return
-        
         try:
+            # We blindly reset state to {} because this is a FRESH session.
+            # No tests are running yet, so no valid locks exist.
             with AtomicLock(lock_path, timeout_seconds=10):
-                with open(config_path, 'r+') as f:
-                    pool = json.load(f)
-                    reset_count = 0
-                    
-                    for role in pool:
-                        for user in pool[role]:
-                            if user.get('reserved_by'):
-                                user['reserved_by'] = None
-                                reset_count += 1
-                    
-                    if reset_count > 0:
-                        f.seek(0)
-                        json.dump(pool, f, indent=4)
-                        f.truncate()
-                        print(f"[Morning Roll Call] Released {reset_count} stuck users.")
-                    else:
-                        print("[Morning Roll Call] User pool is clean.")
+                with open(state_path, 'w') as f:
+                    json.dump({}, f)
+                print(f"[Morning Roll Call] Reset user state at {state_path}")
+                
         except Exception as e:
             print(f"[Morning Roll Call] Error: {e}")

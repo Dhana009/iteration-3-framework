@@ -48,8 +48,7 @@ class UserLease:
             if STATE_PATH.exists():
                 try:
                     with open(STATE_PATH, 'r') as f:
-                        content = f.read().strip()
-                        current_state = json.loads(content) if content else {}
+                        current_state = json.load(f) or {}
                 except (json.JSONDecodeError, FileNotFoundError):
                     current_state = {} # Auto-heal corrupt state
             
@@ -92,8 +91,7 @@ class UserLease:
             if STATE_PATH.exists():
                 try:
                     with open(STATE_PATH, 'r') as f:
-                        content = f.read().strip()
-                        current_state = json.loads(content) if content else {}
+                        current_state = json.load(f) or {}
                 except json.JSONDecodeError:
                     current_state = {}
 
