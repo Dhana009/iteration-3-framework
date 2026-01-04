@@ -1,11 +1,11 @@
 import json
-import os
+from pathlib import Path
 import pytest
 from filelock import FileLock
 from utils.file_lock import AtomicLock
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'user_pool.json')
-LOCK_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'user_pool.lock')
+CONFIG_PATH = Path(__file__).parent.parent / 'config' / 'user_pool.json'
+LOCK_PATH = Path(__file__).parent.parent / 'config' / 'user_pool.lock'
 
 class UserLease:
     def __init__(self, worker_id):

@@ -6,19 +6,21 @@ Standard `filelock` is good, but we wrap it to enforce our specific timeout logi
 
 import os
 import time
+from pathlib import Path
+from typing import Union
 from filelock import FileLock, Timeout
 
 class AtomicLock:
-    def __init__(self, lock_file_path: str, timeout_seconds: int = 10):
+    def __init__(self, lock_file_path: Union[str, Path], timeout_seconds: int = 10):
         """
         Initialize the lock.
         :param lock_file_path: Absolute path to the lock file.
         :param timeout_seconds: How long to wait before crashing. 
                                 We deliberately keep this short. If we wait >10s, something is wrong.
         """
-        self.lock_file = lock_file_path
+        self.lock_file = str(lock_file_path)
         self.timeout = timeout_seconds
-        self.lock = FileLock(lock_file_path, timeout=timeout_seconds)
+        self.lock = FileLock(self.lock_file, timeout=timeout_seconds)
 
     def acquire(self):
         """

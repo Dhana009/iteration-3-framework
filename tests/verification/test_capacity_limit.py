@@ -7,15 +7,17 @@ Scenario:
 - Expected: 1 Success, 1 Failure (RuntimeError).
 """
 import sys
+import sys
 import os
 import json
 import multiprocessing
 import time
+from pathlib import Path
 from fixtures.users import UserLease
 
 # Setup Paths
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CONFIG_PATH = os.path.join(ROOT_DIR, 'config', 'user_pool.json')
+ROOT_DIR = Path(__file__).parent.parent.parent
+CONFIG_PATH = ROOT_DIR / 'config' / 'user_pool.json'
 
 def run_worker(worker_id, should_fail=False):
     lease = UserLease(worker_id=f"worker_{worker_id}")

@@ -1,11 +1,12 @@
+from pathlib import Path
 import os
 import requests
 
 # Manual Env Loader to avoid extra dependencies
 def load_env():
-    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    env_path = Path(__file__).parent.parent / '.env'
     config = {}
-    if os.path.exists(env_path):
+    if env_path.exists():
         with open(env_path, 'r') as f:
             for line in f:
                 line = line.strip()

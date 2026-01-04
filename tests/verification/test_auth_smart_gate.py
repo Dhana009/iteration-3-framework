@@ -9,19 +9,20 @@ Scenario:
 import os
 import json
 import time
+from pathlib import Path
 from fixtures.auth import SmartAuth
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-STATE_DIR = os.path.join(ROOT_DIR, 'state')
-CONFIG_PATH = os.path.join(ROOT_DIR, 'config', 'user_pool.json')
+ROOT_DIR = Path(__file__).parent.parent.parent
+STATE_DIR = ROOT_DIR / 'state'
+CONFIG_PATH = ROOT_DIR / 'config' / 'user_pool.json'
 
 def clean_state(email):
-    path = os.path.join(STATE_DIR, f"{email}.json")
-    if os.path.exists(path):
-        os.remove(path)
+    path = STATE_DIR / f"{email}.json"
+    if path.exists():
+        path.unlink()
 
 def corrupt_state(email):
-    path = os.path.join(STATE_DIR, f"{email}.json")
+    path = STATE_DIR / f"{email}.json"
     with open(path, 'r') as f:
         data = json.load(f)
     

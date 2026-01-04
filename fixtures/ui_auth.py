@@ -1,9 +1,10 @@
+from pathlib import Path
 import os
 import time
 from playwright.sync_api import Browser, Page
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATE_DIR = os.path.join(ROOT_DIR, 'state')
+ROOT_DIR = Path(__file__).parent.parent
+STATE_DIR = ROOT_DIR / 'state'
 
 class SmartUIAuth:
     """
@@ -17,10 +18,10 @@ class SmartUIAuth:
         self.email = email
         self.password = password
         self.browser = browser
-        self.state_path = os.path.join(STATE_DIR, f"{email}_storage.json")
+        self.state_path = STATE_DIR / f"{email}_storage.json"
         
-        if not os.path.exists(STATE_DIR):
-            os.makedirs(STATE_DIR)
+        if not STATE_DIR.exists():
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     def get_storage_state(self):
         """
@@ -40,7 +41,7 @@ class SmartUIAuth:
         Checks if state file exists.
         Future: Could load it and check expiry timestamp.
         """
-        return os.path.exists(self.state_path)
+        return self.state_path.exists()
 
     def _login_and_save(self):
         """
@@ -66,8 +67,8 @@ class SmartUIAuth:
         except Exception as e:
             print(f"[SmartUIAuth] Login Failed: {e}")
             # Ensure we don't save broken state
-            if os.path.exists(self.state_path):
-                os.remove(self.state_path)
+            if self.state_path.exists():
+                self.state_path.unlink()
             raise e
         finally:
             page.close()

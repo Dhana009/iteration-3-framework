@@ -5,13 +5,14 @@ Reason: Verify that if we delete a seed item, the system automatically put it ba
 import os
 import sys
 import time
+from pathlib import Path
 from fixtures.auth import SmartAuth
 from fixtures.seed import check_and_heal_seed, SEED_ITEMS
 from utils.api_client import APIClient
 import json
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CONFIG_PATH = os.path.join(ROOT_DIR, 'config', 'user_pool.json')
+ROOT_DIR = Path(__file__).parent.parent.parent
+CONFIG_PATH = ROOT_DIR / 'config' / 'user_pool.json'
 
 def get_admin_creds():
     with open(CONFIG_PATH, 'r') as f:

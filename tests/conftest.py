@@ -1,19 +1,70 @@
 import pytest
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv() # Load variables from .env
 
 # Ensure root dir is in path
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(ROOT_DIR)
+ROOT_DIR = Path(__file__).parent.parent
+sys.path.append(str(ROOT_DIR))
 
 from fixtures.users import UserLease
 from fixtures.auth import SmartAuth
 from fixtures.ui_auth import SmartUIAuth
 from fixtures.seed import check_and_heal_seed
 from utils.api_client import APIClient
+import json
+from utils.file_lock import AtomicLock
+
+CONFIG_PATH = ROOT_DIR / 'config' / 'user_pool.json'
+LOCK_PATH = ROOT_DIR / 'config' / 'user_pool.lock'
+
+def pytest_sessionstart(session):
+    """
+    Morning Roll Call: Reset User Pool on Session Start.
+    Runs ONLY on the Master node (before workers start).
+    Ensures recovery from previous crashes by un-reserving all users.
+    """
+    if not hasattr(session.config, 'workerinput'):
+        # Inline imports for safety
+        import json
+        from pathlib import Path
+        from utils.file_lock import AtomicLock
+        
+        # Robust path resolution using pytest's rootdir
+        root = Path(session.config.rootdir)
+        config_path = root / 'config' / 'user_pool.json'
+        # AtomicLock expects Union[str, Path], so we can pass Path directly now
+        lock_path = root / 'config' / 'user_pool.lock'
+        
+        if not config_path.exists():
+            print(f"[Morning Roll Call] Config not found at {config_path}")
+            return
+        
+        try:
+            with AtomicLock(lock_path, timeout_seconds=10):
+                with open(config_path, 'r+') as f:
+                    pool = json.load(f)
+                    reset_count = 0
+                    
+                    for role in pool:
+                        for user in pool[role]:
+                            if user.get('reserved_by'):
+                                user['reserved_by'] = None
+                                reset_count += 1
+                    
+                    if reset_count > 0:
+                        f.seek(0)
+                        json.dump(pool, f, indent=4)
+                        f.truncate()
+                        print(f"[Morning Roll Call] Released {reset_count} stuck users.")
+                    else:
+                        print("[Morning Roll Call] User pool is clean.")
+        except Exception as e:
+            print(f"[Morning Roll Call] Error: {e}")
+
 
 @pytest.fixture(scope="session")
 def worker_id_val(worker_id):

@@ -3,13 +3,14 @@ Verification Script: Lock Contention
 Reason: Verify that AtomicLock correctly serializes access across processes.
 """
 import sys
-import os
 import time
 import multiprocessing
+from pathlib import Path
 from utils.file_lock import AtomicLock
 
-LOCK_FILE = "d:/iteration 3 framework/verify_lock.lock"
-OUTPUT_FILE = "d:/iteration 3 framework/verify_output.txt"
+ROOT_DIR = Path(__file__).parent.parent.parent
+LOCK_FILE = ROOT_DIR / "verify_lock.lock"
+OUTPUT_FILE = ROOT_DIR / "verify_output.txt"
 
 def worker(worker_id):
     """
@@ -35,8 +36,8 @@ def worker(worker_id):
 
 def test_lock_contention_verification():
     # Setup
-    if os.path.exists(OUTPUT_FILE):
-        os.remove(OUTPUT_FILE)
+    if OUTPUT_FILE.exists():
+        OUTPUT_FILE.unlink()
     
     processes = []
     
@@ -81,11 +82,11 @@ def test_lock_contention_verification():
     if is_valid and len(lines) == 10:
         print("SUCCESS: Lock enforced perfect serialization.")
         # Cleanup
-        if os.path.exists(OUTPUT_FILE):
-             os.remove(OUTPUT_FILE)
-        if os.path.exists(LOCK_FILE):
+        if OUTPUT_FILE.exists():
+             OUTPUT_FILE.unlink()
+        if LOCK_FILE.exists():
              try:
-                os.remove(LOCK_FILE)
+                LOCK_FILE.unlink()
              except OSError:
                 pass
         assert True
@@ -96,5 +97,5 @@ def test_lock_contention_verification():
 
 if __name__ == "__main__":
     # Add root to path
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sys.path.append(str(ROOT_DIR))
     run_verification()
