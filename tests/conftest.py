@@ -2,6 +2,7 @@ import sys
 import pytest
 from pathlib import Path
 from utils.config import get_config
+from playwright.sync_api import Browser
 
 # Ensure root dir is in path for imports
 ROOT_DIR = Path(__file__).parent.parent
@@ -17,6 +18,7 @@ pytest_plugins = [
     "tests.plugins.pages",
     "tests.plugins.mongodb_fixtures",
     "tests.plugins.api_fixtures",
+    "pytest_playwright",
 ]
 
 def pytest_addoption(parser):
@@ -34,3 +36,14 @@ def env_config(request):
     """
     env_name = request.config.getoption("--env")
     return get_config(env_name)
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """
+    Override browser launch args to run in headed mode (visible browser).
+    """
+    return {
+        **browser_type_launch_args,
+        "headless": False,  # Run browser in headed mode (visible)
+        "slow_mo": 500,  # Slow down operations by 500ms for visibility
+    }
