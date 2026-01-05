@@ -10,6 +10,9 @@ from datetime import datetime
 from pymongo import MongoClient
 from typing import Callable
 
+# Import ItemBuilder for optional builder-based transformation
+from lib.builders.item_builder import ItemBuilder
+
 
 @pytest.fixture(scope="session")
 def mongodb_connection():
@@ -57,13 +60,16 @@ def create_seed_for_user(mongodb_connection) -> Callable:
     from pymongo.errors import BulkWriteError
     from typing import Optional, List, Dict, Any
 
-    def _create(user_email: str, seed_items: Optional[List[Dict[str, Any]]] = None) -> int:
+    def _create(user_email: str, 
+                seed_items: Optional[List[Dict[str, Any]]] = None,
+                use_builder: bool = False) -> int:
         """
         Create seed data for a user
         
         Args:
             user_email: User email address
             seed_items: Optional list of seed items. If None, uses default SEED_ITEMS
+            use_builder: If True, use ItemBuilder for transformation (opt-in feature)
         
         Returns:
             Number of seed items created/existing
@@ -80,8 +86,10 @@ def create_seed_for_user(mongodb_connection) -> Callable:
         
         # Optimized Check: Limit query to verify if enough items exist
         # Fetch just enough to confirm we have the required amount
+        # Check for both String ID (legacy) and ObjectId (new builder)
+        from bson import ObjectId
         existing_items = list(mongodb_connection.items.find({
-            'created_by': user_id,
+            'created_by': {'$in': [user_id, ObjectId(user_id)]},
             'tags': {'$in': ['seed']}
         }).limit(len(items_to_use) + 1))
         
@@ -91,28 +99,35 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             print(f"[MongoDB] ✅ Seed data already exists for {user_email} ({existing_count}+ items)")
             return existing_count
         
-        # Prepare seed items with list comprehension
-        user_id_suffix = user_id[-4:]
-        
-        # Generate timestamp once (more efficient than calling in comprehension)
-        # Use timezone-aware datetime (fixes Python 3.12+ deprecation warning)
-        from datetime import timezone
-        now = datetime.now(timezone.utc)
-        
-        items_to_insert = [
-            {
-                **item,
-                'name': f"{item['name']} - {user_id_suffix}",
-                'created_by': user_id,
-                'tags': ['seed', 'v1.0'],
-                'is_active': item.get('is_active', True), # Default to Active if not specified
-                'normalizedName': f"{item['name']} - {user_id_suffix}".lower(),
-                'normalizedCategory': item['category'].lower() if 'category' in item else None,
-                'createdAt': now,
-                'updatedAt': now
-            }
-            for item in items_to_use
-        ]
+        # Prepare seed items for insertion
+        # Two paths: Builder (new, opt-in) or Manual transformation (existing, default)
+        if use_builder:
+            # NEW PATH: Use ItemBuilder for transformation
+            print(f"[MongoDB] Using ItemBuilder for transformation...")
+            items_to_insert = ItemBuilder.build_many(items_to_use, user_id)
+        else:
+            # EXISTING PATH: Manual transformation (backward compatible)
+            user_id_suffix = user_id[-4:]
+            
+            # Generate timestamp once (more efficient than calling in comprehension)
+            # Use timezone-aware datetime (fixes Python 3.12+ deprecation warning)
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            
+            items_to_insert = [
+                {
+                    **item,
+                    'name': f"{item['name']} - {user_id_suffix}",
+                    'created_by': user_id,
+                    'tags': ['seed', 'v1.0'],
+                    'is_active': item.get('is_active', True), # Default to Active if not specified
+                    'normalizedName': f"{item['name']} - {user_id_suffix}".lower(),
+                    'normalizedCategory': item['category'].lower() if 'category' in item else None,
+                    'createdAt': now,
+                    'updatedAt': now
+                }
+                for item in items_to_use
+            ]
         
         # Bulk insert
         try:
