@@ -1,17 +1,29 @@
 
 import pytest
+import os
 from lib.seed import SEED_ITEMS
 from lib.auth import SmartAuth
 from utils.api_client import APIClient
+
+# Feature flag - checked once at module load time
+_SEED_ENABLED = os.getenv('ENABLE_API_SEED_SETUP', 'true').lower() == 'true'
 
 @pytest.fixture(scope="session")
 def seed_fixture_api(env_config):
     """
     Factory fixture to seed data via API.
     Ensures all backend logic (hooks, timestamps, owner_id) is applied.
+    Includes caching to avoid redundant API calls.
     """
+    # Session-level cache to track seeded users
+    _cache = {}
     
-    def _seed(email: str, password: str = "Test123!@#"):
+    def _seed(email: str, password: str = "Test123!@#", force_refresh: bool = False):
+        # Check cache first (unless force_refresh is True)
+        if not force_refresh and email in _cache:
+            print(f"\n[Seed] ✅ {email} already seeded (cached: {_cache[email]} items)")
+            return _cache[email]
+        
         # 1. Authenticate using SmartAuth (like actors_api.py does)
         print(f"\n[Seed] Authenticating as {email}...")
         try:
@@ -38,6 +50,7 @@ def seed_fixture_api(env_config):
                 
                 if total >= len(SEED_ITEMS):
                     print(f"[Seed] ✅ Data already exists for {email} ({total} items).")
+                    _cache[email] = total  # Cache the result
                     return total
             else:
                 print(f"[Seed] ⚠️ Failed to check items: {response.status_code}")
@@ -90,6 +103,7 @@ def seed_fixture_api(env_config):
                 print(f"[Seed] ❌ Error creating {item['name']}: {e}")
                 
         print(f"[Seed] Created {created} items for {email}.")
+        _cache[email] = created  # Cache the result
         return created
 
     return _seed
@@ -100,10 +114,8 @@ def setup_api_seed_data(seed_fixture_api):
     Session-scoped autouse fixture to ensure standard users have data.
     Controlled by ENABLE_API_SEED_SETUP environment variable.
     """
-    import os
-    
-    # Feature flag check
-    if os.getenv('ENABLE_API_SEED_SETUP', 'true').lower() != 'true':
+    # Feature flag check (uses module-level constant)
+    if not _SEED_ENABLED:
         print("\n[API SeedSetup] Skipped (ENABLE_API_SEED_SETUP=false)")
         return
     

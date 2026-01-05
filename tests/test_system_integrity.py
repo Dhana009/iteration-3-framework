@@ -59,8 +59,8 @@ def test_cleanup_mechanism(admin_actor):
     api = admin_actor['api']
     
     # 1. Create User-Specific Ephemeral Item
-    import uuid
-    unique_id = uuid.uuid4().hex[:8]
+    import time
+    unique_id = int(time.time() * 1000) % 100000  # Last 5 digits of timestamp
     payload = {
         "name": f"Ephemeral Cleanup Test Item {unique_id}",
         "description": "To be deleted - comprehensive test description for cleanup verification",
@@ -84,16 +84,18 @@ def test_cleanup_mechanism(admin_actor):
     assert resp_del.status_code == 200 or resp_del.status_code == 204
     print(f"[Verify] Deleted item {item_id}")
     
-    # 4. Verify Gone (soft delete - item should be inactive)
+    # 4. Verify Gone (soft delete - item should be inactive or 404)
     resp_gone = api.get(f'/items/{item_id}')
-    if resp_gone.status_code == 404:
-        print("[Verify] ✅ Cleanup confirmed: Item gone (404).")
-    elif resp_gone.status_code == 200:
+    assert resp_gone.status_code in (200, 404), f"Unexpected status: {resp_gone.status_code}"
+    
+    if resp_gone.status_code == 200:
+        # Soft delete - verify item is inactive
         item_data = resp_gone.json().get('data', {})
         assert item_data.get('is_active') is False, "Item should be inactive after delete"
         print("[Verify] ✅ Cleanup confirmed: Item is inactive (soft delete).")
     else:
-        raise AssertionError(f"Unexpected status code: {resp_gone.status_code}")
+        # Hard delete
+        print("[Verify] ✅ Cleanup confirmed: Item gone (404).")
 
 def test_on_off_switch_configuration(request):
     """

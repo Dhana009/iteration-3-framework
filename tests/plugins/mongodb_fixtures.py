@@ -85,19 +85,11 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             'tags': {'$in': ['seed']}
         }).limit(len(items_to_use) + 1))
         
-        if len(existing_items) >= len(items_to_use):
-             # If we hit the limit, there might be more items. Get exact count for accuracy.
-             if len(existing_items) > len(items_to_use):
-                 true_count = mongodb_connection.items.count_documents({
-                    'created_by': user_id,
-                    'tags': {'$in': ['seed']}
-                 })
-                 print(f"[MongoDB] Seed data already exists for {user_email} ({true_count} items)")
-                 return true_count
-             
-             # Otherwise we have exactly the count we found
-             print(f"[MongoDB] Seed data already exists for {user_email} (found {len(existing_items)} items)")
-             return len(existing_items)
+        existing_count = len(existing_items)
+        if existing_count >= len(items_to_use):
+            # Seed data exists - return approximate count (exact count not needed)
+            print(f"[MongoDB] ✅ Seed data already exists for {user_email} ({existing_count}+ items)")
+            return existing_count
         
         # Prepare seed items with list comprehension
         user_id_suffix = user_id[-4:]
@@ -123,10 +115,20 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             print(f"[MongoDB] Created {count} seed items for {user_email}")
             return count
         except BulkWriteError as e:
-             # Handle partial insertions (some duplicates)
-            count = e.details['nInserted']
-            print(f"[MongoDB] Partial seed creation for {user_email} ({count} new items)")
-            print(f"[MongoDB] Write Errors: {e.details.get('writeErrors')}")
+            # Handle partial insertions (some duplicates or validation errors)
+            count = e.details.get('nInserted', 0)
+            errors = e.details.get('writeErrors', [])
+            
+            if errors:
+                print(f"[MongoDB] ⚠️ Partial seed creation for {user_email}: {count} inserted, {len(errors)} failed")
+                # Show first 3 errors for debugging
+                for err in errors[:3]:
+                    msg = err.get('errmsg', 'Unknown error')
+                    print(f"  - {msg}")
+                if len(errors) > 3:
+                    print(f"  ... and {len(errors) - 3} more errors")
+            else:
+                print(f"[MongoDB] Partial seed creation for {user_email} ({count} new items)")
             
             # Verify final state
             final_count = mongodb_connection.items.count_documents({
