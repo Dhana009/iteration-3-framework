@@ -11,6 +11,7 @@ Tests API fixtures without seed conflicts:
 
 import pytest
 import os
+import uuid
 
 
 def test_api_fixtures_e2e(
@@ -32,18 +33,19 @@ def test_api_fixtures_e2e(
     
     # Step 1: Create test item via API
     print("\n[Step 1] Creating test item via API...")
+    unique_suffix = uuid.uuid4().hex[:6]
     test_item = create_test_item(api, {
-        "name": "API Test Item",
+        "name": f"API Test Item - {unique_suffix}",
         "description": "Test item created via API fixture for E2E testing",
         "item_type": "DIGITAL",
         "price": 29.99,
-        "category": "Testing",
+        "category": f"Testing {unique_suffix}",
         "download_url": "https://example.com/test.zip",
         "file_size": 512
     })
     
     assert test_item is not None
-    assert test_item['name'] == "API Test Item"
+    assert test_item['name'] == f"API Test Item - {unique_suffix}"
     assert 'test-data' in test_item['tags']
     item_id = test_item['_id']
     print(f"OK Created item: {test_item['name']} (ID: {item_id})")
@@ -77,13 +79,8 @@ def test_api_fixtures_e2e(
     
     # Step 5: Test cleanup endpoint
     print("\n[Step 5] Testing cleanup endpoint for viewer1...")
-    internal_key = os.getenv('INTERNAL_AUTOMATION_KEY', 'flowhub-secret-automation-key-2025')
     
-    result = delete_user_items(
-        "viewer1@test.com",
-        env_config.API_BASE_URL,
-        internal_key
-    )
+    result = delete_user_items("viewer1@test.com")
     
     # Result may be True (deleted) or False (no items/user not found)
     print(f"OK Cleanup endpoint called (result: {result})")

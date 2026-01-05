@@ -11,6 +11,7 @@ Tests:
 
 import pytest
 import os
+import uuid
 
 
 def test_e2e_seed_and_cleanup_integration(
@@ -41,9 +42,11 @@ def test_e2e_seed_and_cleanup_integration(
     api = editor_actor['api']
     
     # Check editor has items (from global setup)
-    response = api.get('/api/v1/items')
+    response = api.get('/items')
     assert response.status_code == 200
-    items = response.json()['data']['items']
+    data = response.json()
+    # GET /items returns: { "status": "success", "items": [...], "pagination": {...} }
+    items = data.get('items', [])
     print(f"OK Editor has {len(items)} items from global setup")
     
     # Step 2: Create seed for editor1 specifically (test individual setup)
@@ -57,24 +60,25 @@ def test_e2e_seed_and_cleanup_integration(
     
     # Step 3: Create test item via API
     print("\n[Step 3] Creating test item via API...")
+    unique_suffix = uuid.uuid4().hex[:6]
     test_item = create_test_item(api, {
-        "name": "E2E Test Item",
+        "name": f"E2E Test Item - {unique_suffix}",
         "description": "This is an end-to-end test item created via API fixture",
         "item_type": "DIGITAL",
         "price": 49.99,
-        "category": "Testing",
+        "category": f"Testing {unique_suffix}",
         "download_url": "https://example.com/e2e-test.zip",
         "file_size": 1024,
         "tags": ["e2e-test", "integration"]
     })
     
     assert test_item is not None
-    assert test_item['name'] == "E2E Test Item"
+    assert test_item['name'] == f"E2E Test Item - {unique_suffix}"
     assert 'test-data' in test_item['tags']
     print(f"OK Created test item: {test_item['name']} (ID: {test_item['_id']})")
     
     # Verify item exists
-    response = api.get(f"/api/v1/items/{test_item['_id']}")
+    response = api.get(f"/items/{test_item['_id']}")
     assert response.status_code == 200
     print(f"OK Verified item exists via API")
     
@@ -85,19 +89,19 @@ def test_e2e_seed_and_cleanup_integration(
     print(f"OK Deleted test item: {test_item['_id']}")
     
     # Verify item is deleted (soft delete)
-    response = api.get(f"/api/v1/items/{test_item['_id']}")
-    assert response.status_code == 404 or response.json()['data'].get('is_active') == False
-    print(f"OK Verified item is deleted")
+    response = api.get(f"/items/{test_item['_id']}")
+    if response.status_code == 404:
+        print(f"OK Item is deleted (404)")
+    else:
+        # GET /items/:id returns: { "status": "success", "data": {...} }
+        item_data = response.json().get('data', {})
+        assert item_data.get('is_active') == False, "Item should be inactive after delete"
+        print(f"OK Item is inactive (soft deleted)")
     
     # Step 5: Delete all items for viewer1
     print("\n[Step 5] Deleting all items for viewer1...")
-    internal_key = os.getenv('INTERNAL_AUTOMATION_KEY', 'flowhub-secret-automation-key-2025')
-    
-    success = delete_user_items(
-        "viewer1@test.com",
-        env_config.API_BASE_URL,
-        internal_key
-    )
+    # Validating cleanup
+    success = delete_user_items("viewer1@test.com")
     
     if success:
         print(f"OK Deleted all items for viewer1")
