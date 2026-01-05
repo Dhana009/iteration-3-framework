@@ -1,135 +1,133 @@
+"""
+API-Based Data Insertion - Simple Insert If Not Exists
+
+IMPORTANT: This module provides simple data insertion with duplicate checking.
+No seed data concepts - just payload insertion with existence check.
+
+Purpose:
+    - Insert data if not exists for authenticated user
+    - Check duplicates by name (efficient indexed query)
+    - Simple payload insertion without seed tags or versioning
+
+Usage:
+    insert_data_if_not_exists(api_client, items_payload)
+"""
 
 import pytest
-import os
-from lib.seed import SEED_ITEMS
-from lib.auth import SmartAuth
-from utils.api_client import APIClient
+from typing import List, Dict, Any, Set
 
-# Feature flag - checked once at module load time
-_SEED_ENABLED = os.getenv('ENABLE_API_SEED_SETUP', 'true').lower() == 'true'
 
 @pytest.fixture(scope="session")
-def seed_fixture_api(env_config):
+def insert_data_if_not_exists():
     """
-    Factory fixture to seed data via API.
-    Ensures all backend logic (hooks, timestamps, owner_id) is applied.
-    Includes caching to avoid redundant API calls.
-    """
-    # Session-level cache to track seeded users
-    _cache = {}
+    Factory fixture: Insert data if not exists (simple duplicate check by name).
     
-    def _seed(email: str, password: str = "Test123!@#", force_refresh: bool = False):
-        # Check cache first (unless force_refresh is True)
-        if not force_refresh and email in _cache:
-            print(f"\n[Seed] ✅ {email} already seeded (cached: {_cache[email]} items)")
-            return _cache[email]
+    Time Complexity: O(n) where n = number of items
+    Space Complexity: O(m) where m = number of existing item names (for duplicate check)
+    
+    Algorithm:
+    1. Fetch existing items by name (single query per unique name) - O(n) queries
+    2. Filter out items that already exist - O(n) time
+    3. Insert only new items - O(k) where k = new items
+    
+    Optimizations:
+    - Uses indexed search query (name search is indexed)
+    - Batches duplicate checks by unique names
+    - Only inserts items that don't exist
+    
+    Returns:
+        Function that inserts items if they don't exist for the authenticated user
         
-        # 1. Authenticate using SmartAuth (like actors_api.py does)
-        print(f"\n[Seed] Authenticating as {email}...")
-        try:
-            auth = SmartAuth(email, password, env_config.API_BASE_URL)
-            token, user_data = auth.authenticate()
-            if not token:
-                print(f"[Seed] ⚠️ Authentication failed for {email}. Skipping seed.")
-                return 0
-        except Exception as e:
-            print(f"[Seed] ⚠️ Authentication error for {email}: {e}")
-            return 0
+    Usage:
+        items = insert_data_if_not_exists(api_client, [
+            {"name": "Item 1", "item_type": "DIGITAL", ...},
+            {"name": "Item 2", "item_type": "PHYSICAL", ...}
+        ])
+    """
+    def _insert(api_client, items_payload: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Insert items if they don't exist for the authenticated user.
         
-        # Create authenticated API client
-        api = APIClient(env_config.API_BASE_URL, token=token)
+        Duplicate Detection:
+        - Checks by item name (case-sensitive)
+        - Uses GET /items?search=name for efficient indexed query
+        - Only inserts items that don't exist
+        
+        Args:
+            api_client: Authenticated APIClient instance
+            items_payload: List of item dictionaries to insert
             
-        # 2. Check Existing Data
-        try:
-            response = api.get('/items')
-            
-            if response.status_code == 200:
-                data = response.json()
-                # API returns: { "status": "success", "items": [...], "pagination": { "total": 100, ... } }
-                total = data.get('pagination', {}).get('total', 0)
-                
-                if total >= len(SEED_ITEMS):
-                    print(f"[Seed] ✅ Data already exists for {email} ({total} items).")
-                    _cache[email] = total  # Cache the result
-                    return total
-            else:
-                print(f"[Seed] ⚠️ Failed to check items: {response.status_code}")
-        except Exception as e:
-            print(f"[Seed] Failed to check items: {e}")
-            # Proceed to try creation anyway
-            
-        # 3. Create Items
-        print(f"[Seed] Seeding {len(SEED_ITEMS)} items for {email}...")
-        created = 0
-        for item in SEED_ITEMS:
-            # Prepare payload - add seed tag
-            payload = item.copy()
-            # Add seed tag to identify seed items
-            if 'tags' not in payload:
-                payload['tags'] = []
-            if 'seed' not in payload['tags']:
-                payload['tags'].append('seed')
-            if 'v1.0' not in payload['tags']:
-                payload['tags'].append('v1.0')
-            
-            # API handles 'is_active' default, but we can set it explicitly
-            if 'is_active' not in payload:
-                payload['is_active'] = True
-                
+        Returns:
+            List of successfully created items
+        """
+        if not items_payload:
+            return []
+        
+        # Step 1: Get existing item names for current user (O(n) queries, but indexed)
+        # Optimization: Batch check by collecting unique names first
+        unique_names: Set[str] = {item.get('name') for item in items_payload if item.get('name')}
+        existing_names: Set[str] = set()
+        
+        # Check each unique name (indexed query - O(log m) per query where m = total items)
+        for name in unique_names:
             try:
-                response = api.post('/items', json=payload)
+                response = api_client.get('/items', params={'search': name, 'limit': 1})
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get('items', [])
+                    # Check if any item with this exact name exists
+                    if items and any(item.get('name') == name for item in items):
+                        existing_names.add(name)
+            except Exception as e:
+                print(f"[Insert] Error checking for item '{name}': {e}")
+                # Continue - will attempt insert and handle 409 if duplicate
+        
+        # Step 2: Filter items that don't exist (O(n) time, O(n) space)
+        items_to_insert = [
+            item for item in items_payload 
+            if item.get('name') not in existing_names
+        ]
+        
+        if not items_to_insert:
+            print(f"[Insert] All {len(items_payload)} items already exist")
+            return []
+        
+        # Step 3: Insert new items (O(k) where k = new items)
+        created_items = []
+        for item in items_to_insert:
+            try:
+                # Don't modify original payload - create copy
+                payload = item.copy()
+                
+                response = api_client.post('/items', json=payload)
                 
                 if response.status_code == 201:
                     data = response.json()
                     if data.get('status') == 'success' and 'data' in data:
-                        created += 1
+                        created_items.append(data['data'])
+                        print(f"[Insert] Created: {item.get('name', 'unknown')}")
                     else:
-                        print(f"[Seed] ⚠️ Unexpected response for {item['name']}: {data}")
+                        print(f"[Insert] Unexpected response for {item.get('name', 'unknown')}")
                 elif response.status_code == 409:
-                    # Duplicate item - already exists, count as success
-                    print(f"[Seed] ℹ️  Item {item['name']} already exists (409)")
-                    created += 1
+                    # Duplicate detected (race condition or name collision)
+                    print(f"[Insert] Item '{item.get('name', 'unknown')}' already exists (409)")
+                elif response.status_code == 400:
+                    # Validation error - log the actual error message
+                    try:
+                        error_data = response.json()
+                        error_msg = error_data.get('message', 'Unknown validation error')
+                        print(f"[Insert] Validation error for '{item.get('name', 'unknown')}': {error_msg}")
+                    except:
+                        print(f"[Insert] Validation error for '{item.get('name', 'unknown')}': {response.status_code} - {response.text[:200]}")
                 elif response.status_code == 403:
-                    # Forbidden - user doesn't have permission
-                    print(f"[Seed] 🛑 User {email} is not authorized to create items (Role: Viewer?). Skipping.")
-                    break
+                    print(f"[Insert] Permission denied for item '{item.get('name', 'unknown')}'")
+                    break  # Stop if user lacks permission
                 else:
-                    print(f"[Seed] ⚠️ Failed to create {item['name']}: {response.status_code} - {response.text[:100]}")
+                    print(f"[Insert] Failed to create '{item.get('name', 'unknown')}': {response.status_code} - {response.text[:200]}")
             except Exception as e:
-                # Handle 403 Forbidden (e.g., Viewer role)
-                if "403" in str(e) or "Forbidden" in str(e):
-                    print(f"[Seed] 🛑 User {email} is not authorized to create items (Role: Viewer?). Skipping.")
-                    break
-                print(f"[Seed] ❌ Error creating {item['name']}: {e}")
-                
-        print(f"[Seed] Created {created} items for {email}.")
-        _cache[email] = created  # Cache the result
-        return created
-
-    return _seed
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_api_seed_data(seed_fixture_api):
-    """
-    Session-scoped autouse fixture to ensure standard users have data.
-    Controlled by ENABLE_API_SEED_SETUP environment variable.
-    """
-    # Feature flag check (uses module-level constant)
-    if not _SEED_ENABLED:
-        print("\n[API SeedSetup] Skipped (ENABLE_API_SEED_SETUP=false)")
-        return
+                print(f"[Insert] Error creating '{item.get('name', 'unknown')}': {e}")
+        
+        print(f"[Insert] Created {len(created_items)}/{len(items_payload)} items")
+        return created_items
     
-    # Seed data for main test actors
-    print("\n[API SeedSetup] Setting up API seed data...")
-    # Admin
-    seed_fixture_api("admin1@test.com")
-    
-    # Editor
-    seed_fixture_api("editor1@test.com")
-    
-    # Admin 2 (if needed)
-    # seed_fixture_api("admin2@test.com")
-    
-    # Viewer? (Usually read-only, check permission)
-    # Trying to seed viewer might fail with 403, logic handles it.
-    seed_fixture_api("viewer1@test.com")
+    return _insert

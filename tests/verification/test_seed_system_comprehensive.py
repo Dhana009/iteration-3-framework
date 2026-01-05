@@ -1,16 +1,19 @@
 """
 Comprehensive Verification: Seed Data System
 
-Tests:
-1. API Fixtures (create_test_item, delete_test_item)
-2. Global Seed Data (setup_api_seed_data)
-3. Cleanup functionality
-4. On/Off switch for seed data
+NOTE: This test file is DEPRECATED. 
+New comprehensive tests are in test_data_management_complete.py
+
+These tests are kept for backward compatibility but are marked as skip.
+Use test_data_management_complete.py for new verification tests.
 """
 
 import pytest
 import os
 import uuid
+
+# Mark all tests as skip - use test_data_management_complete.py instead
+pytestmark = pytest.mark.skip(reason="Deprecated - use test_data_management_complete.py instead")
 
 
 def test_api_fixtures_create_and_delete(admin_actor, create_test_item, delete_test_item):

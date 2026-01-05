@@ -83,13 +83,16 @@ def test_requirement_2_test_level_seed_fixture(editor_actor, create_seed_for_use
     
     # Get user ID
     user_email = editor_actor['user']['email']
-    user_id = editor_actor['user']['_id']
+    user_id = editor_actor['user']['_id']  # ObjectId
+    user_id_str = str(user_id)  # String version for backward compatibility
     
     print(f"✅ Testing with user: {user_email}")
     
-    # Count before
+    # Count before (check both ObjectId and string for backward compatibility)
+    from bson import ObjectId
+    # Explicitly use ObjectId(user_id_str) to ensure MongoDB matches both ObjectId and string types
     count_before = mongodb_connection.items.count_documents({
-        'created_by': user_id,
+        'created_by': {'$in': [ObjectId(user_id_str), user_id_str]},
         'tags': {'$in': ['seed']}
     })
     print(f"✅ Seed items before fixture call: {count_before}")
@@ -98,9 +101,10 @@ def test_requirement_2_test_level_seed_fixture(editor_actor, create_seed_for_use
     result_count = create_seed_for_user(user_email)
     print(f"✅ Fixture returned: {result_count} items")
     
-    # Count after
+    # Count after (check both ObjectId and string for backward compatibility)
+    # Explicitly use ObjectId(user_id_str) to ensure MongoDB matches both ObjectId and string types
     count_after = mongodb_connection.items.count_documents({
-        'created_by': user_id,
+        'created_by': {'$in': [ObjectId(user_id_str), user_id_str]},
         'tags': {'$in': ['seed']}
     })
     print(f"✅ Seed items after fixture call: {count_after}")
@@ -240,13 +244,16 @@ def test_all_requirements_integration(admin_actor, editor_actor, create_seed_for
     # 2. Test-level seed fixture
     editor_email = editor_actor['user']['email']
     editor_user_id = editor_actor['user']['_id']
+    editor_user_id_str = str(editor_user_id)
+    from bson import ObjectId
+    # Explicitly use ObjectId(editor_user_id_str) to ensure MongoDB matches both ObjectId and string types
     count_before = mongodb_connection.items.count_documents({
-        'created_by': editor_user_id,
+        'created_by': {'$in': [ObjectId(editor_user_id_str), editor_user_id_str]},
         'tags': {'$in': ['seed']}
     })
     create_seed_for_user(editor_email)  # Call fixture
     count_after = mongodb_connection.items.count_documents({
-        'created_by': editor_user_id,
+        'created_by': {'$in': [ObjectId(editor_user_id_str), editor_user_id_str]},
         'tags': {'$in': ['seed']}
     })
     assert count_after >= 11, "Test-level seed should work"

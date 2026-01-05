@@ -1,3 +1,25 @@
+"""
+MongoDB Direct Seeding - GLOBAL LEVEL ONLY
+
+IMPORTANT: This module provides GLOBAL-LEVEL seeding that runs ONCE before all tests.
+This is NOT for on-demand seeding during tests.
+
+Architecture:
+- MongoDB Direct Seeding (GLOBAL): Runs once at session start via setup_mongodb_seed
+  - Purpose: One-time baseline seed data before all tests
+  - Method: Direct MongoDB insertion (fast, bypasses API validation)
+  - Trigger: ENABLE_SEED_SETUP=true environment variable
+  - Data Source: Uses SeedDataFactory to generate role-specific data
+  
+- API-Based Insertion (ON-DEMAND): Use insert_data_if_not_exists for test-level data insertion
+  - Purpose: Insert data for specific users on-demand with flexible payloads
+  - Method: API calls (validates through backend, includes duplicate checking)
+  - Trigger: Call insert_data_if_not_exists() in your test when needed
+  - Data Source: Accepts flexible payload (user-provided items)
+
+DO NOT use this for on-demand insertion. Use insert_data_if_not_exists instead.
+"""
+
 import pytest
 import os
 from fixtures.seed_factory import get_user_seed_data
@@ -5,8 +27,19 @@ from fixtures.seed_factory import get_user_seed_data
 @pytest.fixture(scope="session", autouse=True)
 def setup_mongodb_seed(create_seed_for_user):
     """
-    Set up baseline seed data via MongoDB before all tests
-    Runs ONCE at session start (if ENABLE_SEED_SETUP=true)
+    GLOBAL SETUP ONLY: Set up baseline seed data via MongoDB before all tests.
+    
+    This fixture runs ONCE at session start (if ENABLE_SEED_SETUP=true).
+    It is NOT for on-demand seeding during tests.
+    
+    Purpose:
+        - One-time baseline seed data before all tests run
+        - Fast MongoDB direct insertion (bypasses API validation)
+        - Uses factory to generate role-specific data automatically
+    
+    When to use:
+        - Global test setup (automatic, controlled by ENABLE_SEED_SETUP flag)
+        - NOT for test-level insertion (use insert_data_if_not_exists instead)
     
     Uses test data factory to generate user-specific seed data.
     Each user can have different seed data based on their role or custom configuration.
@@ -46,24 +79,26 @@ def setup_mongodb_seed(create_seed_for_user):
     for email in users:  # O(n) iterations
         try:
             # Check for custom config first (O(1) lookup)
+            # If custom config exists, pass it to factory via environment or direct call
+            # Note: CUSTOM_CONFIGS currently empty - factory handles default generation
             if email in CUSTOM_CONFIGS:
-                seed_items = CUSTOM_CONFIGS[email]
-            else:
-                # Lazy generation: Only generate when needed (O(m) time, O(m) space)
-                seed_items = get_user_seed_data(email, use_factory=True)
+                # Custom configs would be passed to factory's custom_config parameter
+                # For now, factory will use default generation
+                pass
             
-            # Create seed data in MongoDB (O(m) time, O(1) space)
-            count = create_seed_for_user(email, seed_items=seed_items)
+            # Create seed data in MongoDB
+            # Responsibility separation: Factory generates data, fixture handles MongoDB
+            count = create_seed_for_user(email)
             total_items += count
             
             # seed_items goes out of scope here, memory freed (streaming approach)
             
         except ValueError as e:
             # User not found - skip gracefully
-            print(f"[SeedSetup] ⚠️  Skipping {email}: {e}")
+            print(f"[SeedSetup] WARNING: Skipping {email}: {e}")
         except Exception as e:
             # Other errors - log and continue
-            print(f"[SeedSetup] ❌ Error for {email}: {e}")
+            print(f"[SeedSetup] ERROR: Error for {email}: {e}")
     
     print(f"[SeedSetup] SUCCESS: Total: {total_items} items created for {len(users)} users")
 

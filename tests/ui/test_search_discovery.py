@@ -1,5 +1,7 @@
 import pytest
 import re
+import os
+import uuid
 from lib.pages.search_page import SearchPage
 
 def test_viewer_can_view_items_list(viewer_ui_actor, env_config):
@@ -40,13 +42,14 @@ def test_viewer_can_view_items_list(viewer_ui_actor, env_config):
     print("[Flow3-Viewer] SUCCESS.")
 
 
-def test_editor_search_by_name(editor_ui_actor, env_config, create_seed_for_user):
+def test_editor_search_by_name(editor_ui_actor, env_config, create_seed_for_user, insert_data_if_not_exists):
     """
     Flow 3: Editor - Search Functionality
     Uses fixture to ensure unique seed data availability.
     """
     actor = editor_ui_actor
     page = actor['page']
+    api = actor['api']
     frontend_base_url = env_config.FRONTEND_BASE_URL
     user_email = actor['user']['email']
     
@@ -56,6 +59,19 @@ def test_editor_search_by_name(editor_ui_actor, env_config, create_seed_for_user
     print(f"[Flow 3 Integration] Seed count verified: {seed_count}")
     # ----------------------------------------------
     
+    # Add test data with a known search term
+    unique_id = uuid.uuid4().hex[:8]
+    search_term = f"SearchTestAlpha{unique_id}"
+    test_items = insert_data_if_not_exists(api, [{
+        "name": f"{search_term} Item",
+        "description": "Test data for Flow 3 search - this meets the minimum length requirement",
+        "item_type": "DIGITAL",
+        "price": 15.00,
+        "category": "Software",
+        "download_url": "https://example.com/search-test.zip",
+        "file_size": 1024
+    }])
+    
     search_page = SearchPage(page)
     
     print(f"\n[Flow3-Editor-Search] Testing search...")
@@ -63,28 +79,46 @@ def test_editor_search_by_name(editor_ui_actor, env_config, create_seed_for_user
     search_page.navigate(f"{frontend_base_url}/items")
     search_page.wait_for_ready()
     
-    # Search
-    term = "Alpha"
-    print(f"[Flow3-Editor-Search] Searching for: {term}")
-    search_page.search(term)
+    # Search for the test item we just created
+    print(f"[Flow3-Editor-Search] Searching for: {search_term}")
+    search_page.search(search_term)
     
     # Verify
     count = search_page.get_items_count()
-    assert count >= 1, f"Should find at least 1 item matching '{term}'"
-    
+    assert count >= 1, f"Should find at least 1 item matching '{search_term}'"
+
     names = search_page.get_all_item_names()
-    assert "Alpha" in names[0], f"First item should contain 'Alpha', got: {names[0]}"
+    assert any(search_term.lower() in name.lower() for name in names), f"Item should contain '{search_term}', got: {names if names else 'no items'}"
+    
+    # Cleanup
+    if test_items:
+        api.delete(f"/items/{test_items[0]['_id']}")
+        print("[Flow3-Editor-Search] Cleaned up test data")
     
     print(f"[Flow3-Editor-Search] SUCCESS: Found {count} items.")
 
 
-def test_editor_filter_by_status_active(editor_ui_actor, env_config):
+def test_editor_filter_by_status_active(editor_ui_actor, env_config, insert_data_if_not_exists):
     """
     Flow 3: Editor - Filter by Status (Active)
     """
     actor = editor_ui_actor
     page = actor['page']
+    api = actor['api']
     frontend_base_url = env_config.FRONTEND_BASE_URL
+    
+    # Ensure we have active items for testing
+    unique_id = uuid.uuid4().hex[:8]
+    test_items = insert_data_if_not_exists(api, [{
+        "name": f"Flow3 Active Test {unique_id}",
+        "description": "Test data for Flow 3 active filter - this meets the minimum length requirement",
+        "item_type": "DIGITAL",
+        "price": 15.00,
+        "category": "Software",
+        "download_url": "https://example.com/active-test.zip",
+        "file_size": 1024,
+        "is_active": True
+    }])
     
     search_page = SearchPage(page)
     
@@ -99,6 +133,11 @@ def test_editor_filter_by_status_active(editor_ui_actor, env_config):
     # Verify
     count = search_page.get_items_count()
     assert count > 0, f"Should show at least 1 active item"
+    
+    # Cleanup
+    if test_items:
+        api.delete(f"/items/{test_items[0]['_id']}")
+        print("[Flow3-Editor-Filter] Cleaned up test data")
     
     statuses = search_page.get_all_item_statuses()
     for status in statuses:
@@ -184,14 +223,78 @@ def test_editor_sort_by_price_ascending(editor_ui_actor, env_config):
     print(f"[Flow3-Editor-Sort] SUCCESS: Sorted ${prices[0]} to ${prices[-1]}.")
 
 
-def test_editor_pagination(editor_ui_actor, env_config):
+def test_editor_pagination(editor_ui_actor, env_config, mongodb_connection, insert_data_if_not_exists):
     """
     Flow 3: Editor - Pagination
+    Verifies pagination works with global seed data + test-specific data.
     """
     actor = editor_ui_actor
     page = actor['page']
+    api = actor['api']
+    user = actor['user']
     frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
+    
+    # Verify global seed data exists
+    print(f"\n[Flow3-Editor-Pagination] Verifying global seed data...")
+    enable_seed_setup = os.getenv('ENABLE_SEED_SETUP', 'false').lower() == 'true'
+    if enable_seed_setup:
+        seed_count = mongodb_connection.items.count_documents({
+            'created_by': user['_id'],
+            'tags': {'$in': ['seed']}
+        })
+        print(f"[Flow3-Editor-Pagination] Global seed data: {seed_count} items")
+        assert seed_count > 0, "Global seed data should exist"
+    
+    # Add test-specific data for pagination testing (need at least 10 items total)
+    unique_id = uuid.uuid4().hex[:8]
+    test_items = insert_data_if_not_exists(api, [
+        {
+            "name": f"Flow3 Pagination Test {unique_id}",
+            "description": "Test data for Flow 3 pagination - this meets the minimum length requirement",
+            "item_type": "DIGITAL",
+            "price": 15.00,
+            "category": "Software",
+            "download_url": "https://example.com/pagination-test.zip",
+            "file_size": 1024
+        },
+        {
+            "name": f"Flow3 Pagination Test 2 {unique_id}",
+            "description": "Test data 2 for Flow 3 pagination - this meets the minimum length requirement",
+            "item_type": "DIGITAL",
+            "price": 20.00,
+            "category": "Software",
+            "download_url": "https://example.com/pagination-test-2.zip",
+            "file_size": 2048
+        },
+        {
+            "name": f"Flow3 Pagination Test 3 {unique_id}",
+            "description": "Test data 3 for Flow 3 pagination - this meets the minimum length requirement",
+            "item_type": "DIGITAL",
+            "price": 25.00,
+            "category": "Software",
+            "download_url": "https://example.com/pagination-test-3.zip",
+            "file_size": 3072
+        },
+        {
+            "name": f"Flow3 Pagination Test 4 {unique_id}",
+            "description": "Test data 4 for Flow 3 pagination - this meets the minimum length requirement",
+            "item_type": "DIGITAL",
+            "price": 30.00,
+            "category": "Software",
+            "download_url": "https://example.com/pagination-test-4.zip",
+            "file_size": 4096
+        },
+        {
+            "name": f"Flow3 Pagination Test 5 {unique_id}",
+            "description": "Test data 5 for Flow 3 pagination - this meets the minimum length requirement",
+            "item_type": "DIGITAL",
+            "price": 35.00,
+            "category": "Software",
+            "download_url": "https://example.com/pagination-test-5.zip",
+            "file_size": 5120
+        }
+    ])
     
     print(f"\n[Flow3-Editor-Pagination] Testing pagination...")
     
@@ -223,16 +326,48 @@ def test_editor_pagination(editor_ui_actor, env_config):
     assert count_p2 > 0, "Page 2 should show items"
     
     print(f"[Flow3-Editor-Pagination] SUCCESS: Page 2 verified.")
+    
+    # Cleanup test data
+    if test_items:
+        for item in test_items:
+            api.delete(f"/items/{item['_id']}")
+        print(f"[Flow3-Editor-Pagination] Cleaned up {len(test_items)} test data items")
 
 
-def test_admin_full_discovery_flow(admin_ui_actor, env_config):
+def test_admin_full_discovery_flow(admin_ui_actor, env_config, mongodb_connection, insert_data_if_not_exists):
     """
     Flow 3: Admin - Combined Discovery Flow
+    Verifies search/discovery works with global seed data + test-specific data.
     """
     actor = admin_ui_actor
     page = actor['page']
+    api = actor['api']
+    user = actor['user']
     frontend_base_url = env_config.FRONTEND_BASE_URL
     search_page = SearchPage(page)
+    
+    # Verify global seed data exists
+    print(f"\n[Flow3-Admin-Combined] Verifying global seed data...")
+    enable_seed_setup = os.getenv('ENABLE_SEED_SETUP', 'false').lower() == 'true'
+    if enable_seed_setup:
+        seed_count = mongodb_connection.items.count_documents({
+            'created_by': user['_id'],
+            'tags': {'$in': ['seed']}
+        })
+        print(f"[Flow3-Admin-Combined] Global seed data: {seed_count} items")
+        assert seed_count > 0, "Global seed data should exist"
+    
+    # Add test-specific data
+    unique_id = uuid.uuid4().hex[:8]
+    test_items = insert_data_if_not_exists(api, [{
+        "name": f"Flow3 Discovery Test {unique_id}",
+        "description": "Test data for Flow 3 discovery - this meets the minimum length requirement",
+        "item_type": "DIGITAL",
+        "price": 25.00,
+        "category": "Software",
+        "download_url": "https://example.com/discovery-test.zip",
+        "file_size": 2048
+    }])
     
     print(f"\n[Flow3-Admin-Combined] Testing full discovery flow...")
     
@@ -267,3 +402,8 @@ def test_admin_full_discovery_flow(admin_ui_actor, env_config):
     assert page.get_by_test_id("item-search").input_value() == ""
     
     print("[Flow3-Admin-Combined] SUCCESS.")
+    
+    # Cleanup test data
+    if test_items:
+        api.delete(f"/items/{test_items[0]['_id']}")
+        print("[Flow3-Admin-Combined] Cleaned up test data")

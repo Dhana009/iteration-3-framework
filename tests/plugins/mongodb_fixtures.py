@@ -1,16 +1,24 @@
 """
-Reusable MongoDB Fixtures for Test Data Management
+MongoDB Direct Seeding Fixtures - GLOBAL LEVEL ONLY
 
-Purpose: Provide factory fixtures for MongoDB operations (create/delete seed data)
+IMPORTANT: These fixtures are for GLOBAL-LEVEL seeding that runs ONCE before all tests.
+They are NOT for on-demand seeding during individual tests.
+
+Architecture:
+- create_seed_for_user: Used by global setup_mongodb_seed fixture
+  - Purpose: Direct MongoDB insertion for global baseline data
+  - Scope: Called during session setup, not during tests
+  - Data Source: Uses SeedDataFactory (role-specific generation)
+  
+For on-demand data insertion with flexible payloads, use insert_data_if_not_exists from seed_fixtures.py instead.
 """
 
 import pytest
 import os
-from datetime import datetime
 from pymongo import MongoClient
 from typing import Callable
 
-# Import ItemBuilder for optional builder-based transformation
+# Import ItemBuilder for transformation
 from lib.builders.item_builder import ItemBuilder
 
 
@@ -43,39 +51,53 @@ def mongodb_connection():
 @pytest.fixture(scope="session")
 def create_seed_for_user(mongodb_connection) -> Callable:
     """
-    Factory fixture: Create seed data for specific user
+    GLOBAL SETUP ONLY: Factory fixture for MongoDB direct seeding.
+    
+    This fixture is used by setup_mongodb_seed for GLOBAL-LEVEL seeding.
+    It is NOT intended for on-demand seeding during tests.
+    
+    Purpose:
+        - Direct MongoDB insertion (fast, bypasses API validation)
+        - Used during session setup to create baseline seed data
+        - Generates role-specific data via SeedDataFactory
+    
+    When to use:
+        - Called automatically by setup_mongodb_seed fixture (global setup)
+        - NOT for test-level seeding (use seed_fixture_api instead)
+    
+    Responsibility: MongoDB operations only (insertion, duplicate checking)
+    Data generation is handled by SeedDataFactory (separate responsibility)
     
     Returns:
         Function that creates seed data for a user email
         
-    Usage:
-        # Use default seed items
+    Usage (internal):
         count = create_seed_for_user("editor1@test.com")
-        
-        # Use custom seed items
-        custom_items = [...]
-        count = create_seed_for_user("admin1@test.com", seed_items=custom_items)
+        Note: This is called by setup_mongodb_seed, not directly in tests.
     """
-    from lib.seed import SEED_ITEMS
     from pymongo.errors import BulkWriteError
-    from typing import Optional, List, Dict, Any
+    from fixtures.seed_factory import get_user_seed_data
 
-    def _create(user_email: str, 
-                seed_items: Optional[List[Dict[str, Any]]] = None,
-                use_builder: bool = False) -> int:
+    def _create(user_email: str) -> int:
         """
-        Create seed data for a user
+        GLOBAL SETUP ONLY: Create seed data for a user via MongoDB direct insertion.
+        
+        This function is called by setup_mongodb_seed during global setup.
+        It is NOT intended for on-demand seeding during tests.
         
         Args:
             user_email: User email address
-            seed_items: Optional list of seed items. If None, uses default SEED_ITEMS
-            use_builder: If True, use ItemBuilder for transformation (opt-in feature)
         
         Returns:
             Number of seed items created/existing
+            
+        Note:
+            Data generation is delegated to SeedDataFactory.
+            This function only handles MongoDB persistence.
+            For on-demand seeding with flexible payloads, use seed_fixture_api instead.
         """
-        # Use provided seed_items or fallback to default
-        items_to_use = seed_items if seed_items is not None else SEED_ITEMS
+        # Data generation responsibility: Use factory to get seed data
+        items_to_use = get_user_seed_data(user_email, use_factory=True)
         
         # Get user ID from MongoDB
         user = mongodb_connection.users.find_one({"email": user_email})
@@ -83,51 +105,32 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             raise ValueError(f"User not found: {user_email}")
         
         user_id = str(user['_id'])
+        user_object_id = user['_id']  # Keep ObjectId for MongoDB queries
         
         # Optimized Check: Limit query to verify if enough items exist
         # Fetch just enough to confirm we have the required amount
         # Check for both String ID (legacy) and ObjectId (new builder)
         from bson import ObjectId
         existing_items = list(mongodb_connection.items.find({
-            'created_by': {'$in': [user_id, ObjectId(user_id)]},
+            'created_by': {'$in': [user_id, user_object_id]},
             'tags': {'$in': ['seed']}
         }).limit(len(items_to_use) + 1))
         
         existing_count = len(existing_items)
         if existing_count >= len(items_to_use):
             # Seed data exists - return approximate count (exact count not needed)
-            print(f"[MongoDB] ✅ Seed data already exists for {user_email} ({existing_count}+ items)")
+            print(f"[MongoDB] Seed data already exists for {user_email} ({existing_count}+ items)")
             return existing_count
         
-        # Prepare seed items for insertion
-        # Two paths: Builder (new, opt-in) or Manual transformation (existing, default)
-        if use_builder:
-            # NEW PATH: Use ItemBuilder for transformation
-            print(f"[MongoDB] Using ItemBuilder for transformation...")
+        # Prepare seed items for insertion using ItemBuilder
+        try:
             items_to_insert = ItemBuilder.build_many(items_to_use, user_id)
-        else:
-            # EXISTING PATH: Manual transformation (backward compatible)
-            user_id_suffix = user_id[-4:]
-            
-            # Generate timestamp once (more efficient than calling in comprehension)
-            # Use timezone-aware datetime (fixes Python 3.12+ deprecation warning)
-            from datetime import timezone
-            now = datetime.now(timezone.utc)
-            
-            items_to_insert = [
-                {
-                    **item,
-                    'name': f"{item['name']} - {user_id_suffix}",
-                    'created_by': user_id,
-                    'tags': ['seed', 'v1.0'],
-                    'is_active': item.get('is_active', True), # Default to Active if not specified
-                    'normalizedName': f"{item['name']} - {user_id_suffix}".lower(),
-                    'normalizedCategory': item['category'].lower() if 'category' in item else None,
-                    'createdAt': now,
-                    'updatedAt': now
-                }
-                for item in items_to_use
-            ]
+        except Exception as e:
+            raise RuntimeError(
+                f"ItemBuilder failed to transform seed items for {user_email}. "
+                f"This indicates an issue with the ItemBuilder. "
+                f"Original error: {type(e).__name__}: {str(e)}"
+            ) from e
         
         # Bulk insert
         try:
@@ -141,7 +144,7 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             errors = e.details.get('writeErrors', [])
             
             if errors:
-                print(f"[MongoDB] ⚠️ Partial seed creation for {user_email}: {count} inserted, {len(errors)} failed")
+                print(f"[MongoDB] WARNING: Partial seed creation for {user_email}: {count} inserted, {len(errors)} failed")
                 # Show first 3 errors for debugging
                 for err in errors[:3]:
                     msg = err.get('errmsg', 'Unknown error')
@@ -151,9 +154,9 @@ def create_seed_for_user(mongodb_connection) -> Callable:
             else:
                 print(f"[MongoDB] Partial seed creation for {user_email} ({count} new items)")
             
-            # Verify final state
+            # Verify final state (check both string and ObjectId for backward compatibility)
             final_count = mongodb_connection.items.count_documents({
-                'created_by': user_id,
+                'created_by': {'$in': [user_object_id, user_id]},
                 'tags': {'$in': ['seed']}
             })
             return final_count
@@ -196,12 +199,12 @@ def delete_user_data(mongodb_connection) -> Callable:
         if response.status_code == 200:
             result = response.json()
             deleted = result.get('deleted', {})
-            print(f"[Cleanup] ✅ Deleted: {deleted.get('items', 0)} items, "
+            print(f"[Cleanup] Deleted: {deleted.get('items', 0)} items, "
                   f"{deleted.get('files', 0)} files, "
                   f"{deleted.get('bulk_jobs', 0)} jobs")
             return True
         else:
-            print(f"[Cleanup] ⚠️  Failed: {response.status_code}")
+            print(f"[Cleanup] WARNING: Failed: {response.status_code}")
             return False
     
     return _delete
@@ -240,12 +243,12 @@ def delete_user_items(mongodb_connection) -> Callable:
         if response.status_code == 200:
             result = response.json()
             deleted = result.get('deleted', {})
-            print(f"[Cleanup] ✅ Deleted: {deleted.get('items', 0)} items, "
+            print(f"[Cleanup] Deleted: {deleted.get('items', 0)} items, "
                   f"{deleted.get('files', 0)} files")
-            print(f"[Cleanup] ✅ Preserved: user, bulk_jobs, activity_logs, otps")
+            print(f"[Cleanup] Preserved: user, bulk_jobs, activity_logs, otps")
             return True
         else:
-            print(f"[Cleanup] ⚠️  Failed: {response.status_code}")
+            print(f"[Cleanup] WARNING: Failed: {response.status_code}")
             return False
     
     return _delete_items

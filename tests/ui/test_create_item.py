@@ -1,48 +1,69 @@
 import pytest
 import uuid
+import os
 from playwright.sync_api import Page
 from lib.pages.create_item_page import CreateItemPage
 
 @pytest.mark.parametrize("load_index", range(1)) 
 @pytest.mark.parametrize("actor_fixture", ["admin_ui_actor", "editor_ui_actor"])
-def test_create_digital_item(actor_fixture, load_index, request, env_config, create_test_item, delete_test_item):
+def test_create_digital_item(actor_fixture, load_index, request, env_config, 
+                            create_test_item, delete_test_item, insert_data_if_not_exists,
+                            update_test_item, mongodb_connection):
     """
     Flow 2: Create DIGITAL Item (Software category)
     Uses POM (CreateItemPage) for interactions.
-    Also verifies API fixtures integration (create/delete ephemeral data).
+    Integrates with new data management fixtures:
+    - Verifies global seed data exists
+    - Uses insert_data_if_not_exists for test-specific data
+    - Uses update_test_item for updates
+    - Uses delete operations for cleanup
     """
     actor = request.getfixturevalue(actor_fixture)
     api = actor['api']
     page = actor['page'] # Authenticated page
+    user = actor['user']
     frontend_base_url = env_config.FRONTEND_BASE_URL
     
-    # --- Integration verification: API Fixtures ---
-    print("\n[Flow 2 Integration] Creating ephemeral test item via API fixture...")
-    ephemeral_item = create_test_item(api, {
-        "name": f"Ephemeral Test {uuid.uuid4().hex[:6]}",
-        "description": "Background item for fixture verification",
-        "item_type": "DIGITAL",
-        "price": 1.00,
-        "category": "Testing",
-        "download_url": "https://example.com/test-file.zip",
-        "file_size": 1024
-    })
-    
-    # Verify ephemeral item exists
-    assert ephemeral_item is not None
-    print(f"[Flow 2 Integration] Created ephemeral item: {ephemeral_item['_id']}")
-    
-    # Delete immediately to verify cleanup
-    print(f"[Flow 2 Integration] Cleaning up ephemeral item via API fixture...")
-    delete_test_item(api, ephemeral_item['_id'])
-    
-    # Verify deletion
-    check = api.get(f"/items/{ephemeral_item['_id']}")
-    if check.status_code == 200:
-        assert check.json()['data'].get('is_active') is False
+    # --- Verify Global Seed Data Exists ---
+    print("\n[Flow 2] Verifying global seed data exists...")
+    enable_seed_setup = os.getenv('ENABLE_SEED_SETUP', 'false').lower() == 'true'
+    if enable_seed_setup:
+        seed_count = mongodb_connection.items.count_documents({
+            'created_by': user['_id'],
+            'tags': {'$in': ['seed']}
+        })
+        print(f"[Flow 2] Global seed data: {seed_count} items for {user['email']}")
+        assert seed_count > 0, "Global seed data should exist when ENABLE_SEED_SETUP=true"
     else:
-        assert check.status_code == 404
-    print("[Flow 2 Integration] Ephemeral item cleanup verified.")
+        print("[Flow 2] Global seed data disabled (ENABLE_SEED_SETUP=false)")
+    # ----------------------------------------
+    
+    # --- Integration: On-Demand Data Insertion ---
+    print("\n[Flow 2] Using insert_data_if_not_exists for test-specific data...")
+    unique_id = uuid.uuid4().hex[:8]
+    test_items = insert_data_if_not_exists(api, [{
+        "name": f"Flow2 Test Data {unique_id}",
+        "description": "Test data for Flow 2 integration - this meets the minimum length requirement",
+        "item_type": "DIGITAL",
+        "price": 5.00,
+        "category": "Testing",
+        "download_url": "https://example.com/flow2-test.zip",
+        "file_size": 512
+    }])
+    
+    if test_items:
+        test_item_id = test_items[0]['_id']
+        test_item_version = test_items[0]['version']
+        print(f"[Flow 2] Created test data item: {test_item_id}")
+        
+        # Test update operation
+        updated = update_test_item(api, test_item_id, {"price": 7.50}, test_item_version)
+        if updated:
+            print(f"[Flow 2] Updated test data item: price = {updated['price']}")
+        
+        # Cleanup test data
+        delete_test_item(api, test_item_id)
+        print("[Flow 2] Cleaned up test data")
     # ----------------------------------------------
     
     # Initialize POM

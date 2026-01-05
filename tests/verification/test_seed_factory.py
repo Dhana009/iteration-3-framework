@@ -127,17 +127,18 @@ def test_get_user_seed_data_helper():
 
 def test_create_seed_for_user_with_custom_items(create_seed_for_user, mongodb_connection):
     """
-    Test 5: Verify create_seed_for_user accepts optional seed_items parameter
+    Test 5: Verify create_seed_for_user works with factory-generated data
+    Note: Responsibility separation - factory generates data, fixture handles MongoDB
     """
     print("\n" + "="*70)
-    print("TEST 5: create_seed_for_user with Custom Items")
+    print("TEST 5: create_seed_for_user with Factory-Generated Data")
     print("="*70)
     
-    # Generate custom seed data using factory
+    # Factory generates data (data generation responsibility)
     custom_items = get_user_seed_data("admin1@test.com", use_factory=True)
     
-    # Create seed data with custom items
-    count = create_seed_for_user("admin1@test.com", seed_items=custom_items)
+    # Fixture handles MongoDB persistence (MongoDB responsibility)
+    count = create_seed_for_user("admin1@test.com")
     
     assert count >= len(custom_items), f"Should create at least {len(custom_items)} items, got {count}"
     print(f"✅ Created {count} custom seed items for admin1")
@@ -152,10 +153,10 @@ def test_create_seed_for_user_with_custom_items(create_seed_for_user, mongodb_co
         'tags': {'$in': ['seed']}
     })
     
-    assert mongo_count >= len(custom_items), f"MongoDB should have at least {len(custom_items)} items"
+    assert mongo_count >= len(expected_items), f"MongoDB should have at least {len(expected_items)} items"
     print(f"✅ Verified {mongo_count} seed items in MongoDB")
     
-    print("✅ TEST 5 PASSED: create_seed_for_user accepts custom seed_items")
+    print("✅ TEST 5 PASSED: create_seed_for_user uses factory for data generation")
 
 
 def test_user_specific_seed_data_created(mongodb_connection):
