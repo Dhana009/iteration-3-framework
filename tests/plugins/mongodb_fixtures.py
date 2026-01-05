@@ -93,6 +93,12 @@ def create_seed_for_user(mongodb_connection) -> Callable:
         
         # Prepare seed items with list comprehension
         user_id_suffix = user_id[-4:]
+        
+        # Generate timestamp once (more efficient than calling in comprehension)
+        # Use timezone-aware datetime (fixes Python 3.12+ deprecation warning)
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        
         items_to_insert = [
             {
                 **item,
@@ -102,8 +108,8 @@ def create_seed_for_user(mongodb_connection) -> Callable:
                 'is_active': item.get('is_active', True), # Default to Active if not specified
                 'normalizedName': f"{item['name']} - {user_id_suffix}".lower(),
                 'normalizedCategory': item['category'].lower() if 'category' in item else None,
-                'createdAt': datetime.utcnow(),
-                'updatedAt': datetime.utcnow()
+                'createdAt': now,
+                'updatedAt': now
             }
             for item in items_to_use
         ]
